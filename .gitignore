@@ -57,10 +57,10 @@ Desktop.ini
 .env
 .env.local
 .env.*.local
-*.env
-
-# asdf
-.tool-versions
+.env.development
+.env.production
+.env.test
+.env.staging
 
 # Logs
 *.log
@@ -88,8 +88,8 @@ cover/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# pyenv
-.python-version
+# pyenv (allow backend/.python-version for enforcing version)
+# .python-version
 
 # Celery
 celerybeat-schedule

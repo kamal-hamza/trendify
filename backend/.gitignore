@@ -21,7 +21,10 @@ db.sqlite3-journal
 # Environment variables
 .env
 .env.local
-*.env
+.env.development
+.env.production
+.env.test
+.env.staging
 
 # Virtual environments
 venv/
@@ -51,6 +54,14 @@ Thumbs.db
 htmlcov/
 .tox/
 .hypothesis/
+
+# Type checking and linting
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+
+# Pre-commit
+.pre-commit-cache/
 
 # Celery
 celerybeat-schedule
