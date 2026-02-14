@@ -1,4 +1,4 @@
-.PHONY: help install install-dev migrate makemigrations runserver shell test test-cov lint format check clean superuser
+.PHONY: help install install-dev migrate makemigrations runserver shell test test-cov lint format check clean superuser celery celery-beat celery-worker celery-flower
 
 # Default target
 help:
@@ -18,6 +18,10 @@ help:
 	@echo "  make superuser        - Create Django superuser"
 	@echo "  make pre-commit       - Install pre-commit hooks"
 	@echo "  make pre-commit-run   - Run pre-commit on all files"
+	@echo "  make celery-worker    - Start Celery worker"
+	@echo "  make celery-beat      - Start Celery beat scheduler"
+	@echo "  make celery-flower    - Start Celery Flower monitoring"
+	@echo "  make celery-purge     - Purge all Celery tasks"
 
 # Install production dependencies
 install:
@@ -171,3 +175,41 @@ show-settings:
 # Generate SECRET_KEY
 generate-secret:
 	@python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# Celery Commands
+
+# Start Celery worker
+celery-worker:
+	celery -A backend worker --loglevel=info
+
+# Start Celery worker with autoreload (for development)
+celery-worker-dev:
+	watchmedo auto-restart -d . -p '*.py' -- celery -A backend worker --loglevel=info
+
+# Start Celery beat scheduler
+celery-beat:
+	celery -A backend beat --loglevel=info
+
+# Start Celery beat with database scheduler
+celery-beat-db:
+	celery -A backend beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+# Start Celery Flower monitoring tool
+celery-flower:
+	celery -A backend flower
+
+# Purge all tasks from queue
+celery-purge:
+	celery -A backend purge
+
+# Show active tasks
+celery-active:
+	celery -A backend inspect active
+
+# Show registered tasks
+celery-tasks:
+	celery -A backend inspect registered
+
+# Show task stats
+celery-stats:
+	celery -A backend inspect stats

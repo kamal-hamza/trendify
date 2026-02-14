@@ -9,3 +9,5 @@ Pillow==11.0.0
 celery==5.4.0
 redis==5.2.0
 psycopg==3.3.2
+django-celery-beat==2.8.1
+django-celery-results==2.6.0
