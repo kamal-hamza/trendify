@@ -52,7 +52,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--test-llm",
             action="store_true",
-            help="Test if LLM (Ollama) is available",
+            help="Test if LLM (OpenRouter) is available",
         )
 
     def handle(self, *args, **options):
@@ -93,21 +93,21 @@ class Command(BaseCommand):
         if is_available:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"\n[SUCCESS] Ollama is running at {llm_resolver.base_url}"
+                    f"\n[SUCCESS] OpenRouter API key is configured"
                 )
             )
-            self.stdout.write(f"Model: {llm_resolver.model}")
+            self.stdout.write(f"Using model: {llm_resolver.model}")
             self.stdout.write("\nLLM-based entity resolution is enabled.")
         else:
             self.stdout.write(
                 self.style.WARNING(
-                    f"\n[WARNING] Ollama not available at {llm_resolver.base_url}"
+                    "\n[WARNING] OPENROUTER_API_KEY not set"
                 )
             )
             self.stdout.write("\nTo enable LLM resolution:")
-            self.stdout.write("  1. Install Ollama: https://ollama.ai/")
-            self.stdout.write(f"  2. Run: ollama pull {llm_resolver.model}")
-            self.stdout.write("  3. Ensure Ollama is running: ollama serve")
+            self.stdout.write("  1. Get a free API key: https://openrouter.ai/keys")
+            self.stdout.write("  2. Set environment variable: OPENROUTER_API_KEY=your_key")
+            self.stdout.write("  3. Or add to .env file: OPENROUTER_API_KEY=your_key")
             self.stdout.write("\nVector-based resolution will still work without LLM.")
 
     def _handle_resolve(self, threshold, use_async):
@@ -166,7 +166,7 @@ class Command(BaseCommand):
         if not llm_resolver.is_available():
             self.stdout.write(
                 self.style.WARNING(
-                    "\n[WARNING] Ollama not available. Cannot run LLM cleanup."
+                    "\n[WARNING] OpenRouter API key not configured. Cannot run LLM cleanup."
                 )
             )
             self.stdout.write("Run with --test-llm to see setup instructions.")
@@ -310,9 +310,9 @@ class Command(BaseCommand):
         llm_resolver = get_llm_resolver()
         if llm_resolver.is_available():
             self.stdout.write(
-                self.style.SUCCESS(f"  - Ollama: Available ({llm_resolver.model})")
+                self.style.SUCCESS(f"  - OpenRouter: Available ({llm_resolver.model})")
             )
         else:
-            self.stdout.write(self.style.WARNING("  - Ollama: Not available"))
+            self.stdout.write(self.style.WARNING("  - OpenRouter: Not configured (set OPENROUTER_API_KEY)"))
 
         self.stdout.write("\n" + "=" * 70)

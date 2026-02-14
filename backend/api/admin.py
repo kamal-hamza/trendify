@@ -2,7 +2,16 @@ from django.contrib import admin
 from django.db.models import Count, Sum
 from django.utils.html import format_html
 
-from .models import Post, Topic, TopicDailyMetric, TopicMention, Watchlist
+from .models import (
+    Entity,
+    EntityNode,
+    Post,
+    Topic,
+    TopicDailyMetric,
+    TopicEntityLink,
+    TopicMention,
+    Watchlist,
+)
 
 
 @admin.register(Topic)
@@ -275,3 +284,156 @@ class WatchlistAdmin(admin.ModelAdmin):
         ),
         ("Timestamps", {"fields": ("created_at",)}),
     )
+
+
+@admin.register(Entity)
+class EntityAdmin(admin.ModelAdmin):
+    list_display = [
+        "canonical_name",
+        "entity_type",
+        "is_active",
+        "node_count",
+        "has_embedding",
+        "created_at",
+    ]
+    list_filter = ["entity_type", "is_active", "created_at"]
+    search_fields = ["canonical_name", "description"]
+    readonly_fields = ["created_at", "updated_at", "embedding_preview"]
+    date_hierarchy = "created_at"
+    ordering = ["-created_at"]
+
+    fieldsets = (
+        (None, {"fields": ("canonical_name", "entity_type", "is_active")}),
+        ("Details", {"fields": ("description",)}),
+        (
+            "Vector Embedding",
+            {
+                "fields": ("embedding_preview",),
+                "classes": ("collapse",),
+            },
+        ),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )
+
+    def node_count(self, obj):
+        return obj.nodes.count()
+
+    node_count.short_description = "Variations"
+
+    def has_embedding(self, obj):
+        if obj.embedding:
+            return format_html('<span style="color: green;">Yes</span>')
+        return format_html('<span style="color: gray;">No</span>')
+
+    has_embedding.short_description = "Embedding"
+
+    def embedding_preview(self, obj):
+        if obj.embedding:
+            vector_length = len(obj.embedding)
+            preview = str(obj.embedding[:5])[:-1] + ", ...]"
+            return f"Vector ({vector_length} dimensions): {preview}"
+        return "No embedding generated"
+
+    embedding_preview.short_description = "Embedding Preview"
+
+
+@admin.register(EntityNode)
+class EntityNodeAdmin(admin.ModelAdmin):
+    list_display = [
+        "label",
+        "parent",
+        "resolution_method",
+        "confidence_score",
+        "alias_count",
+        "has_embedding",
+        "created_at",
+    ]
+    list_filter = ["resolution_method", "confidence_score", "created_at", "parent__entity_type"]
+    search_fields = ["label", "parent__canonical_name", "aliases"]
+    readonly_fields = ["created_at", "updated_at", "embedding_preview"]
+    autocomplete_fields = ["parent"]
+    date_hierarchy = "created_at"
+    ordering = ["-created_at"]
+
+    fieldsets = (
+        (None, {"fields": ("parent", "label")}),
+        (
+            "Resolution",
+            {
+                "fields": (
+                    "resolution_method",
+                    "confidence_score",
+                    "aliases",
+                )
+            },
+        ),
+        (
+            "Vector Embedding",
+            {
+                "fields": ("embedding_preview",),
+                "classes": ("collapse",),
+            },
+        ),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )
+
+    def alias_count(self, obj):
+        return len(obj.aliases) if obj.aliases else 0
+
+    alias_count.short_description = "Aliases"
+
+    def has_embedding(self, obj):
+        if obj.embedding:
+            return format_html('<span style="color: green;">Yes</span>')
+        return format_html('<span style="color: gray;">No</span>')
+
+    has_embedding.short_description = "Embedding"
+
+    def embedding_preview(self, obj):
+        if obj.embedding:
+            vector_length = len(obj.embedding)
+            preview = str(obj.embedding[:5])[:-1] + ", ...]"
+            return f"Vector ({vector_length} dimensions): {preview}"
+        return "No embedding generated"
+
+    embedding_preview.short_description = "Embedding Preview"
+
+
+@admin.register(TopicEntityLink)
+class TopicEntityLinkAdmin(admin.ModelAdmin):
+    list_display = [
+        "topic",
+        "linked_to",
+        "resolution_method",
+        "similarity_score",
+        "created_at",
+    ]
+    list_filter = ["resolution_method", "similarity_score", "created_at"]
+    search_fields = ["topic__name", "entity__canonical_name", "entity_node__label"]
+    readonly_fields = ["created_at", "updated_at"]
+    autocomplete_fields = ["topic", "entity", "entity_node"]
+    date_hierarchy = "created_at"
+    ordering = ["-created_at"]
+
+    fieldsets = (
+        (None, {"fields": ("topic", "entity", "entity_node")}),
+        (
+            "Resolution Details",
+            {
+                "fields": (
+                    "resolution_method",
+                    "similarity_score",
+                )
+            },
+        ),
+        ("Timestamps", {"fields": ("created_at", "updated_at")}),
+    )
+
+    def linked_to(self, obj):
+        if obj.entity:
+            return f"Entity: {obj.entity.canonical_name}"
+        elif obj.entity_node:
+            return f"Node: {obj.entity_node.label} ({obj.entity_node.parent.canonical_name})"
+        return "Unlinked"
+
+    linked_to.short_description = "Linked To"

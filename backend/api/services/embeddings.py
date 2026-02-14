@@ -143,36 +143,30 @@ class EmbeddingService:
 
 class LLMResolver:
     """
-    LLM-based entity resolution using Ollama (free, local).
-    Install Ollama: https://ollama.ai/
-    Then run: ollama pull llama3.2:3b
+    LLM-based entity resolution using OpenRouter's free models.
+    No installation required - uses cloud API with free tier.
+    Get API key: https://openrouter.ai/keys
     """
 
-    def __init__(self, base_url: str = None, model: str = None):
+    def __init__(self, api_key: str = None):
         """
-        Initialize Ollama client.
+        Initialize OpenRouter client.
 
         Args:
-            base_url: Ollama API URL (default: http://localhost:11434)
-            model: Model to use (default: llama3.2:3b)
+            api_key: OpenRouter API key (or set OPENROUTER_API_KEY env var)
         """
-        self.base_url = base_url or os.environ.get(
-            "OLLAMA_BASE_URL", "http://localhost:11434"
-        )
-        self.model = model or os.environ.get("OLLAMA_MODEL", "llama3.2:3b")
-        self.timeout = 60  # Increased timeout for local LLM
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self.base_url = "https://openrouter.ai/api/v1"
+        self.model = "openrouter/auto"  # Automatically routes to free models
+        self.timeout = 30
 
     def is_available(self) -> bool:
-        """Check if Ollama is running and accessible"""
-        try:
-            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
-            return response.status_code == 200
-        except Exception:
-            return False
+        """Check if OpenRouter API key is configured"""
+        return bool(self.api_key)
 
     def resolve_entities(self, keywords: List[str]) -> dict:
         """
-        Use Ollama to identify which keywords are synonyms and group them.
+        Use OpenRouter to identify which keywords are synonyms and group them.
 
         Args:
             keywords: List of keyword strings to resolve
@@ -187,18 +181,18 @@ class LLMResolver:
         if not keywords:
             return {}
 
-        # Check if Ollama is available
+        # Check if API key is configured
         if not self.is_available():
             print(
-                f"Warning: Ollama not available at {self.base_url}. "
-                "Install from https://ollama.ai/ and run: ollama pull {self.model}"
+                "Warning: OPENROUTER_API_KEY not set. "
+                "Get a free API key at https://openrouter.ai/keys"
             )
             return {}
 
         prompt = self._build_resolution_prompt(keywords)
 
         try:
-            response = self._call_ollama(prompt)
+            response = self._call_openrouter(prompt)
 
             # Parse the JSON response
             # Try to extract JSON from response (LLM might add extra text)
@@ -239,25 +233,36 @@ Rules:
 
 Return ONLY valid JSON, no explanation."""
 
-    def _call_ollama(self, prompt: str) -> str:
-        """Call Ollama API"""
-        url = f"{self.base_url}/api/generate"
+    def _call_openrouter(self, prompt: str) -> str:
+        """Call OpenRouter API using free models"""
+        url = f"{self.base_url}/chat/completions"
 
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.0,
-                "num_predict": 2000,
-            },
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
         }
 
-        response = requests.post(url, json=payload, timeout=self.timeout)
+        payload = {
+            "model": self.model,  # "openrouter/auto" routes to free models
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a precise entity resolution system. Return only valid JSON.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            "temperature": 0.0,
+            "max_tokens": 2000,
+        }
+
+        response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
         response.raise_for_status()
 
         data = response.json()
-        return data.get("response", "")
+        return data["choices"][0]["message"]["content"]
 
     def _extract_json(self, text: str) -> dict:
         """Extract JSON from LLM response (might have extra text)"""
@@ -323,11 +328,14 @@ class HybridResolver:
 
             # Only use LLM if we have a reasonable number of clusters
             if 2 <= len(cluster_representatives) <= 50:
-                llm_result = self.llm_resolver.resolve_entities(cluster_representatives)
+                try:
+                    llm_result = self.llm_resolver.resolve_entities(cluster_representatives)
 
-                if llm_result:
-                    # Merge vector clusters with LLM results
-                    return self._merge_results(clusters, llm_result)
+                    if llm_result:
+                        # Merge vector clusters with LLM results
+                        return self._merge_results(clusters, llm_result)
+                except Exception as e:
+                    print(f"LLM resolution failed: {e}, falling back to vector clustering")
 
         # Step 4: Return vector-based clusters if LLM unavailable
         result = {}
