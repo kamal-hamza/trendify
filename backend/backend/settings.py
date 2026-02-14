@@ -207,3 +207,54 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
 # Celery Beat Configuration (for periodic tasks)
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Celery Beat Schedule (Cron jobs)
+# Run the full daily pipeline once per day at 2 AM UTC
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'fetch-all-platforms-daily': {
+        'task': 'api.tasks.full_pipeline_daily',
+        'schedule': crontab(hour=2, minute=0),  # Run at 2:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 12,  # Task expires after 12 hours if not executed
+        }
+    },
+    'calculate-daily-metrics': {
+        'task': 'api.tasks.calculate_daily_metrics',
+        'schedule': crontab(hour=3, minute=0),  # Run at 3:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'check-watchlist-alerts': {
+        'task': 'api.tasks.check_watchlist_alerts',
+        'schedule': crontab(hour=4, minute=0),  # Run at 4:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'resolve-topics-to-entities': {
+        'task': 'api.tasks.resolve_topics_to_entities',
+        'schedule': crontab(hour=5, minute=0),  # Run at 5:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'llm-entity-cleanup': {
+        'task': 'api.tasks.llm_entity_cleanup',
+        'schedule': crontab(hour='*/6'),  # Run every 6 hours
+        'kwargs': {'max_keywords': 50},
+        'options': {
+            'expires': 3600 * 3,
+        }
+    },
+    'cleanup-old-data-weekly': {
+        'task': 'api.tasks.cleanup_old_data',
+        'schedule': crontab(hour=1, minute=0, day_of_week=0),  # Run at 1:00 AM every Sunday
+        'kwargs': {'days': 90},
+        'options': {
+            'expires': 3600 * 12,
+        }
+    },
+}
