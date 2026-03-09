@@ -1,4 +1,4 @@
-.PHONY: help install install-dev migrate makemigrations runserver shell test test-cov lint format check clean superuser celery celery-beat celery-worker celery-flower
+.PHONY: help install install-dev migrate makemigrations dev shell test test-cov lint format check clean superuser celery celery-beat celery-worker celery-flower
 
 # Default target
 help:
@@ -7,7 +7,7 @@ help:
 	@echo "  make install-dev      - Install development dependencies"
 	@echo "  make migrate          - Run database migrations"
 	@echo "  make makemigrations   - Create new migrations"
-	@echo "  make runserver        - Start Django development server"
+	@echo "  make dev              - Start Django development server"
 	@echo "  make shell            - Start Django shell"
 	@echo "  make test             - Run tests"
 	@echo "  make test-cov         - Run tests with coverage report"
@@ -41,7 +41,7 @@ makemigrations:
 	python manage.py makemigrations
 
 # Start development server
-runserver:
+dev:
 	python manage.py runserver
 
 # Start Django shell
@@ -149,7 +149,7 @@ reset-db: flush migrate
 setup-dev: install-dev migrate
 	@echo "Development environment setup complete!"
 	@echo "Run 'make superuser' to create an admin user"
-	@echo "Run 'make runserver' to start the development server"
+	@echo "Run 'make dev' to start the development server"
 
 # Production setup
 setup-prod: install migrate collectstatic

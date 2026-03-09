@@ -1,3 +1,4 @@
+from datetime import dt_timezone
 import json
 from datetime import datetime
 from pathlib import Path
@@ -197,7 +198,7 @@ class Command(BaseCommand):
 
         # Handle Unix timestamp (int or float)
         if isinstance(timestamp, (int, float)):
-            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return datetime.fromtimestamp(timestamp, tz=dt_timezone.utc)
 
         # Handle string timestamps
         if isinstance(timestamp, str):

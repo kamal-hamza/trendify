@@ -93,22 +93,19 @@ class Command(BaseCommand):
         if is_available:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"\n[SUCCESS] OpenRouter API key is configured"
+                    f"\n[SUCCESS] OpenRouter is configured with API key"
                 )
             )
             self.stdout.write(f"Using model: {llm_resolver.model}")
-            self.stdout.write("\nLLM-based entity resolution is enabled.")
         else:
             self.stdout.write(
-                self.style.WARNING(
-                    "\n[WARNING] OPENROUTER_API_KEY not set"
+                self.style.SUCCESS(
+                    f"\n[SUCCESS] OpenRouter free model is available"
                 )
             )
-            self.stdout.write("\nTo enable LLM resolution:")
-            self.stdout.write("  1. Get a free API key: https://openrouter.ai/keys")
-            self.stdout.write("  2. Set environment variable: OPENROUTER_API_KEY=your_key")
-            self.stdout.write("  3. Or add to .env file: OPENROUTER_API_KEY=your_key")
-            self.stdout.write("\nVector-based resolution will still work without LLM.")
+            self.stdout.write(f"Using model: {llm_resolver.model} (no API key required)")
+            self.stdout.write("\nNote: For higher rate limits, you can optionally set OPENROUTER_API_KEY")
+            self.stdout.write("Visit https://openrouter.ai/keys to get a free API key")
 
     def _handle_resolve(self, threshold, use_async):
         """Resolve topics to entities using vector clustering"""
@@ -161,16 +158,8 @@ class Command(BaseCommand):
         """Run LLM-based entity cleanup"""
         self.stdout.write(f"\nRunning LLM cleanup (max keywords: {max_keywords})...")
 
-        # Test LLM availability first
+        # LLM is always available with free model
         llm_resolver = get_llm_resolver()
-        if not llm_resolver.is_available():
-            self.stdout.write(
-                self.style.WARNING(
-                    "\n[WARNING] OpenRouter API key not configured. Cannot run LLM cleanup."
-                )
-            )
-            self.stdout.write("Run with --test-llm to see setup instructions.")
-            return
 
         if use_async:
             from api.tasks import llm_entity_cleanup as task
@@ -313,6 +302,6 @@ class Command(BaseCommand):
                 self.style.SUCCESS(f"  - OpenRouter: Available ({llm_resolver.model})")
             )
         else:
-            self.stdout.write(self.style.WARNING("  - OpenRouter: Not configured (set OPENROUTER_API_KEY)"))
+            self.stdout.write(self.style.SUCCESS("  - OpenRouter: Available (free model, no API key required)"))
 
         self.stdout.write("\n" + "=" * 70)

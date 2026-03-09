@@ -117,20 +117,27 @@ class PostAdmin(admin.ModelAdmin):
     title_short.short_description = "Title"
 
     def sentiment_indicator(self, obj):
-        if obj.sentiment_score > 0.3:
+        if obj.sentiment_score is None:
+            return format_html('<span style="color: gray;">N/A</span>')
+        
+        score = float(obj.sentiment_score)
+        if score > 0.3:
             color = "green"
             icon = "😊"
-        elif obj.sentiment_score < -0.3:
+        elif score < -0.3:
             color = "red"
             icon = "😞"
         else:
             color = "gray"
             icon = "😐"
+        
+        # Format the score as a string first, then pass to format_html
+        score_str = f"{score:.2f}"
         return format_html(
-            '<span style="color: {};">{} {:.2f}</span>',
+            '<span style="color: {};">{} {}</span>',
             color,
             icon,
-            obj.sentiment_score,
+            score_str,
         )
 
     sentiment_indicator.short_description = "Sentiment"
@@ -213,42 +220,54 @@ class TopicDailyMetricAdmin(admin.ModelAdmin):
     )
 
     def momentum_indicator(self, obj):
-        if obj.momentum_score > 2.0:
+        if obj.momentum_score is None:
+            return format_html('<span style="color: gray;">N/A</span>')
+        
+        score = float(obj.momentum_score)
+        if score > 2.0:
             color = "red"
             icon = "🚀"
-        elif obj.momentum_score > 0:
+        elif score > 0:
             color = "green"
             icon = "📈"
-        elif obj.momentum_score < 0:
+        elif score < 0:
             color = "orange"
             icon = "📉"
         else:
             color = "gray"
             icon = "➖"
+        
+        score_str = f"{score:.2f}"
         return format_html(
-            '<span style="color: {}; font-weight: bold;">{} {:.2f}</span>',
+            '<span style="color: {}; font-weight: bold;">{} {}</span>',
             color,
             icon,
-            obj.momentum_score,
+            score_str,
         )
 
     momentum_indicator.short_description = "Momentum"
 
     def engagement_momentum_indicator(self, obj):
-        if obj.engagement_momentum > 0:
+        if obj.engagement_momentum is None:
+            return format_html('<span style="color: gray;">N/A</span>')
+        
+        momentum = float(obj.engagement_momentum)
+        if momentum > 0:
             color = "green"
             icon = "⬆"
-        elif obj.engagement_momentum < 0:
+        elif momentum < 0:
             color = "red"
             icon = "⬇"
         else:
             color = "gray"
             icon = "➖"
+        
+        momentum_str = f"{momentum:.0f}"
         return format_html(
-            '<span style="color: {};">{} {:.0f}</span>',
+            '<span style="color: {};">{} {}</span>',
             color,
             icon,
-            obj.engagement_momentum,
+            momentum_str,
         )
 
     engagement_momentum_indicator.short_description = "Engagement Δ"

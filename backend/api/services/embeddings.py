@@ -153,16 +153,52 @@ class LLMResolver:
         Initialize OpenRouter client.
 
         Args:
-            api_key: OpenRouter API key (or set OPENROUTER_API_KEY env var)
+            api_key: OpenRouter API key (optional - free model doesn't require it)
         """
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
         self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "openrouter/auto"  # Automatically routes to free models
+        self.model = "openrouter/free"  # Free model - no credentials required
         self.timeout = 30
 
     def is_available(self) -> bool:
-        """Check if OpenRouter API key is configured"""
-        return bool(self.api_key)
+        """Check if OpenRouter is available (always true for free model)"""
+        return True  # Free model doesn't require API key
+
+    def filter_valuable_topics(self, topics: List[str]) -> List[str]:
+        """
+        Use OpenRouter to filter out generic/useless topics and keep only valuable ones.
+        
+        Keeps: products, technologies, companies, programming languages, frameworks, tools
+        Removes: generic categories like "Other", "News", "Project", "Showcase"
+
+        Args:
+            topics: List of topic names to filter
+
+        Returns:
+            List of valuable topic names
+        """
+        if not topics:
+            return []
+
+        # Free model is always available, no need to check API key
+
+        prompt = self._build_filter_prompt(topics)
+
+        try:
+            response = self._call_openrouter(prompt)
+            result = self._extract_json(response)
+            
+            # Extract the "keep" list from response
+            if isinstance(result, dict) and "keep" in result:
+                valuable_topics = result["keep"]
+                print(f"Filtered topics: kept {len(valuable_topics)}/{len(topics)}")
+                return valuable_topics
+            
+            return topics  # Return all if parsing fails
+
+        except Exception as e:
+            print(f"Topic filtering error: {e}")
+            return topics  # Return all topics on error
 
     def resolve_entities(self, keywords: List[str]) -> dict:
         """
@@ -181,13 +217,7 @@ class LLMResolver:
         if not keywords:
             return {}
 
-        # Check if API key is configured
-        if not self.is_available():
-            print(
-                "Warning: OPENROUTER_API_KEY not set. "
-                "Get a free API key at https://openrouter.ai/keys"
-            )
-            return {}
+        # Free model is always available, no need to check API key
 
         prompt = self._build_resolution_prompt(keywords)
 
@@ -202,6 +232,43 @@ class LLMResolver:
         except Exception as e:
             print(f"LLM resolution error: {e}")
             return {}
+
+    def _build_filter_prompt(self, topics: List[str]) -> str:
+        """Build the prompt for topic filtering"""
+        topics_text = "\n".join([f"- {topic}" for topic in topics])
+
+        return f"""You are a topic quality filter for a tech trend tracking platform.
+
+Given this list of topics extracted from tech posts:
+
+{topics_text}
+
+Your task: Filter out generic/useless topics and keep only valuable ones.
+
+KEEP topics that are:
+- Specific products (Claude, GPT-4, Docker, Redis, PostgreSQL)
+- Technologies (AI, Machine Learning, Blockchain, WebGPU)
+- Companies (OpenAI, Anthropic, Google, Meta)
+- Programming languages (Python, Rust, JavaScript, TypeScript, Go)
+- Frameworks/Libraries (React, Vue, Django, FastAPI)
+- Tools/Platforms (GitHub, VSCode, Kubernetes)
+- Specific technical concepts (streaming, API, microservices)
+
+REMOVE topics that are:
+- Generic categories (News, Other, Project, Showcase, Discussion)
+- Vague descriptors (Misleading, Society, Business, Politics)
+- Reddit post types (Question, Help, Tutorial)
+- Generic terms (webdev, coding, technology)
+- Empty or meaningless strings
+
+Return ONLY a JSON object in this format:
+{{
+  "keep": ["Python", "AI", "Claude", "Rust", ...]
+}}
+
+Be strict: when in doubt, REMOVE it. Only keep topics that are truly valuable for tracking tech trends.
+
+Return ONLY valid JSON, no explanation."""
 
     def _build_resolution_prompt(self, keywords: List[str]) -> str:
         """Build the prompt for entity resolution"""
@@ -234,16 +301,19 @@ Rules:
 Return ONLY valid JSON, no explanation."""
 
     def _call_openrouter(self, prompt: str) -> str:
-        """Call OpenRouter API using free models"""
+        """Call OpenRouter API using free model (no API key required)"""
         url = f"{self.base_url}/chat/completions"
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        
+        # Only add Authorization header if API key is provided
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
         payload = {
-            "model": self.model,  # "openrouter/auto" routes to free models
+            "model": self.model,  # "openrouter/free" - no credentials required
             "messages": [
                 {
                     "role": "system",

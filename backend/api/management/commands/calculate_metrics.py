@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone

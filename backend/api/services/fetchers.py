@@ -6,7 +6,7 @@ Fetches trending content from multiple platforms (HN, Reddit, GitHub)
 import re
 import time
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any, Dict, List, Tuple
 
 import requests
@@ -81,6 +81,7 @@ class HackerNewsFetcher(BaseFetcher):
                         "num_comments": hit.get("num_comments", 0),
                         "author": hit.get("author", ""),
                         "published_at": published_at,
+                        "topics": [],  # HN doesn't provide explicit topics
                     }
                 )
 
@@ -88,6 +89,88 @@ class HackerNewsFetcher(BaseFetcher):
 
         except Exception as e:
             print(f"Error fetching from Hacker News: {e}")
+            return []
+
+    def search_by_topics(self, topics: List[str], limit_per_topic: int = 5, hours_ago: int = 24) -> List[Dict[str, Any]]:
+        """
+        Search Hacker News for posts related to specific topics
+        
+        Args:
+            topics: List of topics/keywords to search for
+            limit_per_topic: Maximum posts per topic
+            hours_ago: Only fetch stories from this many hours ago
+            
+        Returns:
+            List of post dictionaries matching the topics
+        """
+        posts = []
+        seen_ids = set()  # Avoid duplicates
+
+        try:
+            cutoff_time = int(
+                (datetime.now() - timedelta(hours=hours_ago)).timestamp()
+            )
+
+            url = "https://hn.algolia.com/api/v1/search"
+
+            for topic in topics:
+                try:
+                    params = {
+                        "query": topic,
+                        "tags": "story",
+                        "numericFilters": f"created_at_i>{cutoff_time},points>5",
+                        "hitsPerPage": limit_per_topic,
+                    }
+
+                    response = requests.get(url, params=params, timeout=self.timeout)
+                    response.raise_for_status()
+
+                    data = response.json()
+                    hits = data.get("hits", [])
+
+                    for hit in hits:
+                        story_id = str(hit.get("objectID", ""))
+                        
+                        # Skip duplicates
+                        if story_id in seen_ids:
+                            continue
+                        seen_ids.add(story_id)
+
+                        # Parse timestamp
+                        created_at = hit.get("created_at")
+                        if created_at:
+                            published_at = datetime.fromisoformat(
+                                created_at.replace("Z", "+00:00")
+                            )
+                        else:
+                            published_at = timezone.now()
+
+                        posts.append(
+                            {
+                                "external_id": story_id,
+                                "title": hit.get("title", ""),
+                                "url": hit.get("url")
+                                or f"https://news.ycombinator.com/item?id={story_id}",
+                                "source": "HN",
+                                "score": hit.get("points", 0),
+                                "num_comments": hit.get("num_comments", 0),
+                                "author": hit.get("author", ""),
+                                "published_at": published_at,
+                                "topics": [topic],  # Tag with search topic
+                            }
+                        )
+
+                    # Rate limiting
+                    time.sleep(0.5)
+
+                except Exception as e:
+                    print(f"Error searching HN for topic '{topic}': {e}")
+                    continue
+
+            return posts
+
+        except Exception as e:
+            print(f"Error in HN topic search: {e}")
             return []
 
 
@@ -107,7 +190,7 @@ class RedditFetcher(BaseFetcher):
 
     def fetch(
         self, subreddits: List[str] = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Fetch HOT posts from tech subreddits
 
@@ -116,12 +199,13 @@ class RedditFetcher(BaseFetcher):
             limit: Maximum posts per subreddit
 
         Returns:
-            List of post dictionaries
+            Dictionary with posts and discovered topics
         """
         if subreddits is None:
             subreddits = self.DEFAULT_SUBREDDITS
 
         posts = []
+        discovered_topics = set()  # Track unique topics
 
         for sub in subreddits:
             try:
@@ -147,10 +231,24 @@ class RedditFetcher(BaseFetcher):
                     created_utc = post_data.get("created_utc", 0)
                     if created_utc:
                         published_at = datetime.fromtimestamp(
-                            created_utc, tz=timezone.utc
+                            created_utc, tz=dt_timezone.utc
                         )
                     else:
                         published_at = timezone.now()
+
+                    # Extract topics from subreddit and flair
+                    post_topics = []
+                    
+                    # Add subreddit as topic
+                    subreddit_name = post_data.get("subreddit", sub)
+                    post_topics.append(subreddit_name)
+                    discovered_topics.add(subreddit_name)
+                    
+                    # Add flair if available
+                    flair = post_data.get("link_flair_text")
+                    if flair:
+                        post_topics.append(flair)
+                        discovered_topics.add(flair)
 
                     posts.append(
                         {
@@ -163,6 +261,7 @@ class RedditFetcher(BaseFetcher):
                             "author": post_data.get("author", ""),
                             "content": post_data.get("selftext", ""),
                             "published_at": published_at,
+                            "topics": post_topics,  # Add topics metadata
                         }
                     )
 
@@ -173,13 +272,16 @@ class RedditFetcher(BaseFetcher):
                 print(f"Error fetching from r/{sub}: {e}")
                 continue
 
-        return posts
+        return {
+            "posts": posts,
+            "topics": list(discovered_topics),
+        }
 
 
 class GitHubFetcher(BaseFetcher):
     """Fetches trending repositories from GitHub"""
 
-    def fetch(self, days_ago: int = 7, limit: int = 15) -> List[Dict[str, Any]]:
+    def fetch(self, days_ago: int = 7, limit: int = 15) -> Dict[str, Any]:
         """
         Fetch trending repositories from GitHub
 
@@ -188,9 +290,10 @@ class GitHubFetcher(BaseFetcher):
             limit: Maximum number of repos to fetch
 
         Returns:
-            List of post dictionaries (repos as posts)
+            Dictionary with posts and discovered topics
         """
         posts = []
+        discovered_topics = set()  # Track unique topics
 
         try:
             # Search for repos created recently with high stars
@@ -233,6 +336,21 @@ class GitHubFetcher(BaseFetcher):
                 else:
                     published_at = timezone.now()
 
+                # Extract topics from GitHub repo
+                post_topics = []
+                
+                # Add GitHub topics (hashtags)
+                repo_topics = repo.get("topics", [])
+                for topic in repo_topics:
+                    post_topics.append(topic)
+                    discovered_topics.add(topic)
+                
+                # Add programming language
+                language = repo.get("language")
+                if language:
+                    post_topics.append(language)
+                    discovered_topics.add(language)
+
                 posts.append(
                     {
                         "external_id": str(repo.get("id", "")),
@@ -244,14 +362,18 @@ class GitHubFetcher(BaseFetcher):
                         "author": repo.get("owner", {}).get("login", ""),
                         "content": description,
                         "published_at": published_at,
+                        "topics": post_topics,  # Add topics metadata
                     }
                 )
 
-            return posts
+            return {
+                "posts": posts,
+                "topics": list(discovered_topics),
+            }
 
         except Exception as e:
             print(f"Error fetching from GitHub: {e}")
-            return []
+            return {"posts": [], "topics": []}
 
 
 class KeywordExtractor:
@@ -382,39 +504,41 @@ class TrendifyAggregator:
         include_hn: bool = True,
         include_reddit: bool = True,
         include_github: bool = True,
+        use_topic_search: bool = True,
     ) -> Dict[str, Any]:
         """
-        Fetch from all platforms
+        Fetch from all platforms with intelligent topic discovery
+        
+        First fetches from Reddit/GitHub to discover trending topics,
+        then uses those topics to search Hacker News for related content.
 
         Args:
             include_hn: Whether to fetch from Hacker News
             include_reddit: Whether to fetch from Reddit
             include_github: Whether to fetch from GitHub
+            use_topic_search: Whether to use discovered topics to search HN
 
         Returns:
-            Dictionary with all_posts and stats
+            Dictionary with all_posts, discovered_topics, and stats
         """
         all_posts = []
+        discovered_topics = set()
         stats = {
             "total_posts": 0,
             "sources": {},
             "errors": [],
+            "discovered_topics": 0,
         }
 
-        # Fetch from each platform
-        if include_hn:
-            try:
-                hn_posts = self.hn_fetcher.fetch()
-                all_posts.extend(hn_posts)
-                stats["sources"]["HN"] = len(hn_posts)
-                time.sleep(1)  # Rate limiting
-            except Exception as e:
-                stats["errors"].append(f"HN: {str(e)}")
-
+        # Phase 1: Fetch from Reddit and GitHub to discover topics
         if include_reddit:
             try:
-                reddit_posts = self.reddit_fetcher.fetch()
+                reddit_result = self.reddit_fetcher.fetch()
+                reddit_posts = reddit_result.get("posts", [])
+                reddit_topics = reddit_result.get("topics", [])
+                
                 all_posts.extend(reddit_posts)
+                discovered_topics.update(reddit_topics)
                 stats["sources"]["Reddit"] = len(reddit_posts)
                 time.sleep(1)  # Rate limiting
             except Exception as e:
@@ -422,18 +546,96 @@ class TrendifyAggregator:
 
         if include_github:
             try:
-                github_posts = self.github_fetcher.fetch()
+                github_result = self.github_fetcher.fetch()
+                github_posts = github_result.get("posts", [])
+                github_topics = github_result.get("topics", [])
+                
                 all_posts.extend(github_posts)
+                discovered_topics.update(github_topics)
                 stats["sources"]["GitHub"] = len(github_posts)
+                time.sleep(1)  # Rate limiting
             except Exception as e:
                 stats["errors"].append(f"GitHub: {str(e)}")
 
+        # Phase 2: Fetch from Hacker News
+        if include_hn:
+            try:
+                # Get front page posts
+                hn_posts = self.hn_fetcher.fetch()
+                all_posts.extend(hn_posts)
+                hn_count = len(hn_posts)
+                
+                # Phase 3: Search HN using discovered topics (if enabled)
+                if use_topic_search and discovered_topics:
+                    # Filter and prioritize topics for search
+                    # Focus on tech-related topics, limit to top 15
+                    priority_topics = self._prioritize_topics(list(discovered_topics))[:15]
+                    
+                    print(f"Searching HN for {len(priority_topics)} discovered topics...")
+                    topic_posts = self.hn_fetcher.search_by_topics(priority_topics, limit_per_topic=3)
+                    all_posts.extend(topic_posts)
+                    hn_count += len(topic_posts)
+                
+                stats["sources"]["HN"] = hn_count
+                time.sleep(1)  # Rate limiting
+            except Exception as e:
+                stats["errors"].append(f"HN: {str(e)}")
+
         stats["total_posts"] = len(all_posts)
+        stats["discovered_topics"] = len(discovered_topics)
 
         return {
             "all_posts": all_posts,
+            "discovered_topics": list(discovered_topics),
             "stats": stats,
         }
+    
+    def _prioritize_topics(self, topics: List[str]) -> List[str]:
+        """
+        Prioritize and filter topics for HN search
+        
+        Args:
+            topics: List of discovered topics
+            
+        Returns:
+            Filtered and prioritized list of topics
+        """
+        # Filter out very generic or non-tech topics
+        skip_keywords = {
+            "question", "help", "discussion", "tutorial", "guide",
+            "meta", "news", "announcement", "other", "general",
+        }
+        
+        # Prioritize tech-focused topics
+        priority_keywords = {
+            "ai", "ml", "python", "javascript", "rust", "go", "java",
+            "react", "vue", "angular", "docker", "kubernetes", "aws",
+            "machine-learning", "deep-learning", "llm", "gpt", "claude",
+            "openai", "anthropic", "security", "blockchain", "crypto",
+        }
+        
+        prioritized = []
+        regular = []
+        
+        for topic in topics:
+            topic_lower = topic.lower()
+            
+            # Skip generic topics
+            if topic_lower in skip_keywords:
+                continue
+            
+            # Skip very short topics
+            if len(topic) < 2:
+                continue
+                
+            # Prioritize tech keywords
+            if topic_lower in priority_keywords or any(kw in topic_lower for kw in priority_keywords):
+                prioritized.append(topic)
+            else:
+                regular.append(topic)
+        
+        # Return prioritized first, then regular
+        return prioritized + regular
 
     def extract_keywords(self, posts: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
         """

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 
 from celery import shared_task
 from django.conf import settings
@@ -30,10 +30,10 @@ from .services.fetchers import TrendifyAggregator
 def calculate_sentiment_score(post_id):
     """
     Calculate sentiment score for a post using VADER sentiment analysis.
-    
+
     Args:
         post_id: ID of the post to analyze
-    
+
     Returns:
         The calculated sentiment score
     """
@@ -68,10 +68,10 @@ def calculate_sentiment_score(post_id):
 def batch_calculate_sentiment(post_ids):
     """
     Calculate sentiment scores for multiple posts in batch.
-    
+
     Args:
         post_ids: List of post IDs to analyze
-    
+
     Returns:
         Number of posts processed
     """
@@ -89,11 +89,11 @@ def calculate_daily_metrics(date=None, topic_id=None):
     """
     Calculate daily metrics for all topics or a specific topic.
     This is the core task for velocity/momentum tracking.
-    
+
     Args:
         date: Date to calculate metrics for (defaults to yesterday)
         topic_id: Optional specific topic ID to calculate for
-    
+
     Returns:
         Number of metrics calculated
     """
@@ -173,11 +173,11 @@ def calculate_daily_metrics(date=None, topic_id=None):
 def calculate_all_historical_metrics(start_date=None, end_date=None):
     """
     Calculate daily metrics for a date range. Useful for backfilling data.
-    
+
     Args:
         start_date: Start date (YYYY-MM-DD string or date object)
         end_date: End date (YYYY-MM-DD string or date object)
-    
+
     Returns:
         Total number of metrics calculated
     """
@@ -208,10 +208,10 @@ def detect_exploding_trends(momentum_threshold=2.0):
     """
     Detect "exploding" trends - topics with high momentum scores.
     This powers the "Exploding" tab in the UI.
-    
+
     Args:
         momentum_threshold: Minimum momentum score to be considered "exploding"
-    
+
     Returns:
         List of exploding topic names
     """
@@ -236,7 +236,7 @@ def check_watchlist_alerts():
     """
     Check all user watchlists and send alerts for topics that have crossed
     their momentum threshold.
-    
+
     Returns:
         Number of alerts sent
     """
@@ -277,7 +277,7 @@ def check_watchlist_alerts():
 def send_watchlist_alert(watchlist_id, metric_id):
     """
     Send an alert email to a user about a trending topic on their watchlist.
-    
+
     Args:
         watchlist_id: ID of the watchlist entry
         metric_id: ID of the TopicDailyMetric that triggered the alert
@@ -324,11 +324,11 @@ Trendify - Track What Matters
 def extract_topics_from_post(post_id, keywords=None):
     """
     Extract topics from a post based on keywords and create TopicMention entries.
-    
+
     Args:
         post_id: ID of the post to process
         keywords: Optional list of keywords to search for. If None, uses all active topics.
-    
+
     Returns:
         Number of topics extracted
     """
@@ -376,10 +376,10 @@ def extract_topics_from_post(post_id, keywords=None):
 def cleanup_old_data(days=90):
     """
     Clean up old data from the database to manage storage.
-    
+
     Args:
         days: Number of days to keep data (default: 90)
-    
+
     Returns:
         Dictionary with counts of deleted items
     """
@@ -403,7 +403,7 @@ def generate_daily_report():
     """
     Generate a daily summary report of trending topics.
     Can be scheduled to run every day via celery-beat.
-    
+
     Returns:
         Report data as dictionary
     """
@@ -513,14 +513,16 @@ def fetch_all_platforms(
     try:
         aggregator = TrendifyAggregator()
 
-        # Fetch all posts
+        # Fetch all posts with topic discovery
         result = aggregator.fetch_all(
             include_hn=include_hn,
             include_reddit=include_reddit,
             include_github=include_github,
+            use_topic_search=True,  # Enable topic-based HN search
         )
 
         all_posts = result["all_posts"]
+        discovered_topics = result.get("discovered_topics", [])
         stats = result["stats"]
 
         # Save posts to database
@@ -559,21 +561,60 @@ def fetch_all_platforms(
                 print(f"Error saving post: {e}")
                 continue
 
-        # Extract and create topics from all posts
-        keywords = aggregator.extract_keywords(all_posts)
+        # Create topics from discovered platform topics (Reddit/GitHub)
         topics_created = 0
+        topic_map = {}  # Map topic name to Topic object
 
-        for keyword, count in keywords:
+        for topic_name in discovered_topics:
             # Create topic if it doesn't exist
             topic, created = Topic.objects.get_or_create(
-                name=keyword,
-                defaults={"category": "OTHER", "is_active": True},
+                name=topic_name,
+                defaults={"category": "TECH", "is_active": True},
             )
+            topic_map[topic_name] = topic
 
             if created:
                 topics_created += 1
+        
+        # Also extract keywords as backup topics
+        keywords = aggregator.extract_keywords(all_posts)
+        for keyword, count in keywords[:10]:  # Limit to top 10 keywords
+            if keyword not in topic_map:
+                topic, created = Topic.objects.get_or_create(
+                    name=keyword,
+                    defaults={"category": "OTHER", "is_active": True},
+                )
+                topic_map[keyword] = topic
+                if created:
+                    topics_created += 1
 
-        # Queue topic extraction for all new posts
+        # Create TopicMentions for posts with explicit topics
+        mentions_created = 0
+        for post_data in all_posts:
+            external_id = f"{post_data['source']}:{post_data['external_id']}"
+            
+            try:
+                post = Post.objects.get(external_id=external_id)
+                post_topics = post_data.get("topics", [])
+                
+                # Link post to its explicit topics
+                for topic_name in post_topics:
+                    if topic_name in topic_map:
+                        topic = topic_map[topic_name]
+                        mention, created = TopicMention.objects.get_or_create(
+                            topic=topic,
+                            post=post,
+                            defaults={
+                                "relevance_score": 1.0,  # Explicit topic = high relevance
+                                "is_primary": True,
+                            },
+                        )
+                        if created:
+                            mentions_created += 1
+            except Post.DoesNotExist:
+                continue
+        
+        # Queue additional topic extraction for all posts (to catch keywords)
         new_post_ids = Post.objects.filter(
             external_id__in=[
                 f"{p['source']}:{p['external_id']}" for p in all_posts
@@ -588,6 +629,8 @@ def fetch_all_platforms(
             "saved": saved_count,
             "skipped": skipped_count,
             "topics_created": topics_created,
+            "discovered_topics": len(discovered_topics),
+            "mentions_created": mentions_created,
             "sources": stats["sources"],
             "errors": stats["errors"],
         }
@@ -834,11 +877,8 @@ def llm_entity_cleanup(max_keywords=50):
         Number of entities resolved
     """
     try:
-        # Check if LLM is available
+        # LLM is always available with free model
         llm_resolver = get_llm_resolver()
-        if not llm_resolver.is_available():
-            print("LLM not available. Install Ollama and run: ollama pull llama3.2:3b")
-            return 0
 
         # Get top unlinked topics by momentum
         today = timezone.now().date()
