@@ -276,6 +276,13 @@ CELERY_BEAT_SCHEDULE = {
             'expires': 3600 * 12,  # Task expires after 12 hours if not executed
         }
     },
+    'fetch-emerging-platforms': {
+        'task': 'api.tasks.fetch_emerging_platforms',
+        'schedule': crontab(hour='*/6'),  # Run every 6 hours for early trend detection
+        'options': {
+            'expires': 3600 * 4,
+        }
+    },
     'calculate-daily-metrics': {
         'task': 'api.tasks.calculate_daily_metrics',
         'schedule': crontab(hour=3, minute=0),  # Run at 3:00 AM UTC daily
@@ -314,3 +321,7 @@ CELERY_BEAT_SCHEDULE = {
         }
     },
 }
+
+# External API Configuration
+# Product Hunt API token for fetching product launches
+PRODUCT_HUNT_API_TOKEN = os.environ.get('PRODUCT_HUNT_API_TOKEN', None)

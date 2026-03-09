@@ -68,6 +68,14 @@ export interface TrendingTopic {
   peak_date: string | null;
 }
 
+export interface EmergingTopic extends TrendingTopic {
+  avg_growth_rate: number;
+  max_growth_rate: number;
+  first_seen: string;
+  age_days: number;
+  is_new: boolean;
+}
+
 export interface Post {
   id: number;
   external_id: string;
@@ -193,6 +201,11 @@ export const fetchTopic = async (id: number): Promise<Topic> => {
 
 export const fetchTrendingTopics = async (params?: FilterParams): Promise<TrendingTopic[]> => {
   const { data } = await api.get('/topics/trending/', { params });
+  return data;
+};
+
+export const fetchEmergingTopics = async (params?: FilterParams): Promise<EmergingTopic[]> => {
+  const { data } = await api.get('/topics/emerging/', { params });
   return data;
 };
 

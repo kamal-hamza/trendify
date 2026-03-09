@@ -163,6 +163,192 @@ class TopicViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"])
+    def emerging(self, request):
+        """
+        Get emerging/fast-growing topics
+        Filters for:
+        - Recently discovered topics (created within last 7 days)
+        - High growth rate (>50% growth)
+        - Topics gaining momentum
+        - Excludes generic/common topics
+        
+        Query params:
+        - days: Number of days to analyze (default: 7)
+        - limit: Number of results (default: 20)
+        - category: Filter by category
+        - min_growth: Minimum growth rate (default: 0.5 = 50%)
+        - max_age_days: Maximum age of topic (default: 30)
+        - min_mentions: Minimum mentions to avoid noise (default: 3)
+        """
+        try:
+            days = int(request.query_params.get("days", 7))
+            limit = int(request.query_params.get("limit", 20))
+            category = request.query_params.get("category")
+            min_growth = float(request.query_params.get("min_growth", 0.5))
+            max_age_days = int(request.query_params.get("max_age_days", 30))
+            min_mentions = int(request.query_params.get("min_mentions", 3))
+            
+            # Get date range
+            end_date = date.today()
+            start_date = end_date - timedelta(days=days)
+            age_cutoff = timezone.now() - timedelta(days=max_age_days)
+            
+            # Filter out generic/common topic names
+            generic_topics = [
+                'ai', 'python', 'javascript', 'c', 'discussion', 'webdev',
+                'programming', 'artificial', 'code', 'project', 'software',
+                'open', 'technology', 'data', 'other', 'tutorial', 'guide',
+                'help', 'question', 'announcement', 'news', 'update',
+                'and the', 'the', 'a', 'an', 'for', 'with', 'to', 'of',
+                'artificial intelligence', 'machine learning', 'deep learning',
+                'web development', 'software engineering', 'computer science',
+            ]
+            
+            # Build query for recently created topics
+            topics_query = Topic.objects.filter(
+                is_active=True,
+                created_at__gte=age_cutoff,
+            ).exclude(
+                name__iregex=r'^(show hn|launch|ban|cli|open-source|productivity)$'
+            )
+            
+            # Exclude very generic single-word topics
+            for generic in generic_topics:
+                topics_query = topics_query.exclude(name__iexact=generic)
+            
+            if category:
+                topics_query = topics_query.filter(category=category)
+            
+            # Get metrics for these topics
+            metrics_query = TopicDailyMetric.objects.filter(
+                date__gte=start_date,
+                date__lte=end_date,
+                topic__in=topics_query,
+            )
+            
+            # Aggregate metrics by topic with growth rate
+            emerging_data = (
+                metrics_query.values(
+                    "topic__id",
+                    "topic__name",
+                    "topic__category",
+                    "topic__created_at",
+                )
+                .annotate(
+                    total_mentions=Sum("total_mentions"),
+                    total_engagement=Sum("total_engagement"),
+                    avg_sentiment=Avg("avg_sentiment"),
+                    momentum_score=Avg("momentum_score"),
+                    engagement_momentum=Avg("engagement_momentum"),
+                    avg_growth_rate=Avg("growth_rate"),
+                    max_growth_rate=Max("growth_rate"),
+                    recent_posts_count=Count("topic__posts"),
+                    peak_date=Max("date"),
+                    first_seen=Min("date"),
+                )
+                .filter(
+                    avg_growth_rate__gte=min_growth,
+                    total_mentions__gte=min_mentions,
+                )
+                .order_by("-total_mentions", "-avg_growth_rate", "-momentum_score")[:limit * 5]
+            )
+            
+            # Enrich with source breakdown and calculate emergence score
+            results = []
+            for item in emerging_data:
+                topic_id = item["topic__id"]
+                topic_name = item["topic__name"]
+                
+                # Skip if topic name is too short or too generic
+                if len(topic_name) <= 2 or topic_name.lower() in ['and', 'the', 'or', 'but']:
+                    continue
+                
+                # Get source breakdown
+                source_metrics = (
+                    TopicDailyMetric.objects.filter(
+                        topic_id=topic_id,
+                        date__gte=start_date,
+                        date__lte=end_date,
+                    )
+                    .values("source_breakdown")
+                    .first()
+                )
+                
+                # Calculate age in days
+                created_at = item["topic__created_at"]
+                age_days = (timezone.now() - created_at).days
+                
+                # Calculate emergence score (custom scoring)
+                # Factors: mentions, growth rate, sentiment, source diversity, source quality
+                sources = source_metrics.get("source_breakdown", {}) if source_metrics else {}
+                source_count = len(sources)
+                
+                # Boost score for emerging-focused sources
+                source_quality_boost = 0
+                if 'PRODUCT_HUNT' in sources:
+                    source_quality_boost += 50  # Product Hunt = new products
+                if 'HN' in sources and 'Show HN' in topic_name:
+                    source_quality_boost += 40  # Show HN = launches
+                if 'DEVTO' in sources:
+                    source_quality_boost += 20  # Dev.to = developer content
+                if 'GITHUB' in sources and item["total_mentions"] <= 10:
+                    source_quality_boost += 30  # New GitHub repos
+                
+                # Penalize if topic name is very generic or short
+                name_penalty = 0
+                if len(topic_name) <= 4:
+                    name_penalty = 20
+                
+                emergence_score = (
+                    item["total_mentions"] * 0.25 +
+                    item["avg_growth_rate"] * 100 * 0.20 +
+                    (item["avg_sentiment"] + 1) * 50 * 0.15 +
+                    source_count * 20 * 0.15 +
+                    source_quality_boost * 0.25 -
+                    name_penalty
+                )
+                
+                results.append(
+                    {
+                        "id": item["topic__id"],
+                        "name": item["topic__name"],
+                        "category": item["topic__category"],
+                        "category_display": dict(Topic.CATEGORY_CHOICES).get(
+                            item["topic__category"], item["topic__category"]
+                        ),
+                        "total_mentions": item["total_mentions"] or 0,
+                        "total_engagement": item["total_engagement"] or 0,
+                        "avg_sentiment": round(item["avg_sentiment"] or 0, 2),
+                        "momentum_score": round(item["momentum_score"] or 0, 2),
+                        "engagement_momentum": round(item["engagement_momentum"] or 0, 2),
+                        "avg_growth_rate": round(item["avg_growth_rate"] or 0, 2),
+                        "max_growth_rate": round(item["max_growth_rate"] or 0, 2),
+                        "recent_posts_count": item["recent_posts_count"],
+                        "sources": source_metrics["source_breakdown"]
+                        if source_metrics
+                        else {},
+                        "peak_date": item["peak_date"],
+                        "first_seen": item["first_seen"],
+                        "age_days": age_days,
+                        "is_new": age_days <= 7,
+                        "emergence_score": round(emergence_score, 2),
+                    }
+                )
+            
+            # Sort by emergence score and limit
+            results = sorted(results, key=lambda x: x["emergence_score"], reverse=True)[:limit]
+            
+            serializer = TrendingTopicSerializer(results, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error getting emerging topics: {e}")
+            return Response(
+                {"error": "Failed to retrieve emerging topics"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["get"])
     def timeline(self, request, pk=None):
         """

@@ -238,6 +238,9 @@ class Post(models.Model):
         ("REDDIT_PROGRAMMING", "r/programming"),
         ("GITHUB", "GitHub"),
         ("TWITTER", "Twitter/X"),
+        ("PRODUCT_HUNT", "Product Hunt"),
+        ("DEVTO", "Dev.to"),
+        ("INDIEHACKERS", "Indie Hackers"),
         ("OTHER", "Other"),
     ]
 
@@ -357,6 +360,10 @@ class TopicDailyMetric(models.Model):
     engagement_momentum = models.FloatField(
         default=0.0,
         help_text="Change in total engagement vs. previous day",
+    )
+    growth_rate = models.FloatField(
+        default=0.0,
+        help_text="Percentage growth in mentions vs. previous day (0.0 = no change, 1.0 = 100% growth)",
     )
 
     # Breakdown by source

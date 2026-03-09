@@ -6,6 +6,7 @@ export interface FilterState {
   days: number;
   search: string;
   ordering: string;
+  mode: 'trending' | 'emerging';
 }
 
 interface FilterStore extends FilterState {
@@ -14,6 +15,7 @@ interface FilterStore extends FilterState {
   setDays: (days: number) => void;
   setSearch: (search: string) => void;
   setOrdering: (ordering: string) => void;
+  setMode: (mode: 'trending' | 'emerging') => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
 }
@@ -24,6 +26,7 @@ const defaultFilters: FilterState = {
   days: 7,
   search: '',
   ordering: '-momentum_score',
+  mode: 'trending',
 };
 
 export const useFilterStore = create<FilterStore>((set) => ({
@@ -34,6 +37,7 @@ export const useFilterStore = create<FilterStore>((set) => ({
   setDays: (days) => set({ days }),
   setSearch: (search) => set({ search }),
   setOrdering: (ordering) => set({ ordering }),
+  setMode: (mode) => set({ mode }),
 
   setFilters: (filters) => set((state) => ({ ...state, ...filters })),
 

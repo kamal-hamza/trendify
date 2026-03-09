@@ -270,6 +270,14 @@ class TrendingTopicSerializer(serializers.Serializer):
     recent_posts_count = serializers.IntegerField()
     sources = serializers.JSONField()
     peak_date = serializers.DateField(allow_null=True)
+    
+    # Emerging topic fields (optional - only present for emerging endpoint)
+    avg_growth_rate = serializers.FloatField(required=False)
+    max_growth_rate = serializers.FloatField(required=False)
+    first_seen = serializers.DateField(required=False, allow_null=True)
+    age_days = serializers.IntegerField(required=False)
+    is_new = serializers.BooleanField(required=False)
+    emergence_score = serializers.FloatField(required=False)
 
 
 class FeedStatsSerializer(serializers.Serializer):
