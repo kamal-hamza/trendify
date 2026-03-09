@@ -96,10 +96,17 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # Database Configuration
-# Production: PostgreSQL only (via DATABASE_URL)
-# Development: PostgreSQL if DATABASE_URL is set, otherwise SQLite
-if DJANGO_ENV == 'production':
-    # Production must use PostgreSQL
+# Simple: DEBUG=True uses SQLite, DEBUG=False uses PostgreSQL
+if DEBUG:
+    # Development: Use SQLite for simplicity
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    # Production: Use PostgreSQL via DATABASE_URL or manual config
     if os.environ.get('DATABASE_URL'):
         DATABASES = {
             'default': dj_database_url.config(
@@ -109,7 +116,7 @@ if DJANGO_ENV == 'production':
             )
         }
     else:
-        # Manual PostgreSQL configuration for production
+        # Manual PostgreSQL configuration
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
@@ -121,25 +128,6 @@ if DJANGO_ENV == 'production':
                 'OPTIONS': {
                     'connect_timeout': 10,
                 },
-            }
-        }
-else:
-    # Development: Use PostgreSQL if DATABASE_URL is set, otherwise SQLite
-    if os.environ.get('DATABASE_URL'):
-        # PostgreSQL via DATABASE_URL
-        DATABASES = {
-            'default': dj_database_url.config(
-                default=os.environ.get('DATABASE_URL'),
-                conn_max_age=600,
-                conn_health_checks=True,
-            )
-        }
-    else:
-        # SQLite (default for development)
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
             }
         }
 
