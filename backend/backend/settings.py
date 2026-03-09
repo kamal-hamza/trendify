@@ -17,15 +17,18 @@ import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
+# Determine environment first (can be set via system env var)
+DJANGO_ENV = os.environ.get('DJANGO_ENV', 'development')
+
+# Load environment variables from appropriate .env file
 try:
     from dotenv import load_dotenv
-    load_dotenv(BASE_DIR / '.env')
+    if DJANGO_ENV == 'production':
+        load_dotenv(BASE_DIR / '.env.production')
+    else:
+        load_dotenv(BASE_DIR / '.env.development')
 except ImportError:
     pass
-
-# Determine environment
-DJANGO_ENV = os.environ.get('DJANGO_ENV', 'development')
 
 
 # Quick-start development settings - unsuitable for production
@@ -51,6 +54,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'django_filters',
+    'drf_spectacular',
     'corsheaders',
     'django_celery_beat',
     'django_celery_results',
@@ -91,10 +96,10 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # Database Configuration
-# Use SQLite for development, PostgreSQL for production
+# Production: PostgreSQL only (via DATABASE_URL)
+# Development: PostgreSQL if DATABASE_URL is set, otherwise SQLite
 if DJANGO_ENV == 'production':
-    # PostgreSQL Configuration for Production
-    # Support for DATABASE_URL connection string (common in hosting platforms)
+    # Production must use PostgreSQL
     if os.environ.get('DATABASE_URL'):
         DATABASES = {
             'default': dj_database_url.config(
@@ -104,7 +109,7 @@ if DJANGO_ENV == 'production':
             )
         }
     else:
-        # Manual PostgreSQL configuration
+        # Manual PostgreSQL configuration for production
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
@@ -113,16 +118,30 @@ if DJANGO_ENV == 'production':
                 'PASSWORD': os.environ.get('DB_PASSWORD'),
                 'HOST': os.environ.get('DB_HOST', 'localhost'),
                 'PORT': os.environ.get('DB_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                },
             }
         }
 else:
-    # SQLite Configuration for Development
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+    # Development: Use PostgreSQL if DATABASE_URL is set, otherwise SQLite
+    if os.environ.get('DATABASE_URL'):
+        # PostgreSQL via DATABASE_URL
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=os.environ.get('DATABASE_URL'),
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
         }
-    }
+    else:
+        # SQLite (default for development)
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 
 # Password validation
@@ -170,8 +189,40 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # CORS Configuration (if django-cors-headers is installed)
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else []
 
+# Allow all origins in development
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
 # CSRF Configuration
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if os.environ.get('CSRF_TRUSTED_ORIGINS') else []
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
+
+# DRF Spectacular Configuration (API Documentation)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Trendify API',
+    'DESCRIPTION': 'Tech trend aggregation and analysis API - Track emerging technologies across GitHub, Hacker News, Reddit, and Stack Overflow',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+}
 
 
 # Security Settings for Production
@@ -194,8 +245,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html
 
 # Celery Broker Configuration
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+# Use REDIS_URL for hosted Redis (e.g., Redis Cloud, Upstash, etc.)
+# Falls back to local Redis for development if REDIS_URL is not set
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', REDIS_URL)
+
+# Redis connection pool settings for hosted Redis
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_POOL_LIMIT = 10
+
+# SSL/TLS Configuration for rediss:// URLs (e.g., Upstash, Redis Cloud)
+import ssl
+if REDIS_URL.startswith('rediss://'):
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
 
 # Celery Task Configuration
 CELERY_ACCEPT_CONTENT = ['json']

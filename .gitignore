@@ -118,3 +118,7 @@ dmypy.json
 
 # Cython
 cython_debug/
+
+# Plan
+PLAN.md
+proposal.txt
