@@ -10,37 +10,60 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Determine environment first (can be set via system env var)
+DJANGO_ENV = os.environ.get('DJANGO_ENV', 'development')
+
+# Load environment variables from appropriate .env file
+try:
+    from dotenv import load_dotenv
+    if DJANGO_ENV == 'production':
+        load_dotenv(BASE_DIR / '.env.production')
+    else:
+        load_dotenv(BASE_DIR / '.env.development')
+except ImportError:
+    pass
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wqq5v6*jrtl$d(pw5^+^(p0i*2#e8*uze6(o692hdthn0@jk84'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-wqq5v6*jrtl$d(pw5^+^(p0i*2#e8*uze6(o692hdthn0@jk84')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else []
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'api',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'django_filters',
+    'drf_spectacular',
+    'corsheaders',
+    'django_celery_beat',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -72,12 +95,41 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database Configuration
+# Simple: DEBUG=True uses SQLite, DEBUG=False uses PostgreSQL
+if DEBUG:
+    # Development: Use SQLite for simplicity
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    # Production: Use PostgreSQL via DATABASE_URL or manual config
+    if os.environ.get('DATABASE_URL'):
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=os.environ.get('DATABASE_URL'),
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+    else:
+        # Manual PostgreSQL configuration
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.environ.get('DB_NAME', 'trendify_prod'),
+                'USER': os.environ.get('DB_USER', 'postgres'),
+                'PASSWORD': os.environ.get('DB_PASSWORD'),
+                'HOST': os.environ.get('DB_HOST', 'localhost'),
+                'PORT': os.environ.get('DB_PORT', '5432'),
+                'OPTIONS': {
+                    'connect_timeout': 10,
+                },
+            }
+        }
 
 
 # Password validation
@@ -115,3 +167,150 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# CORS Configuration (if django-cors-headers is installed)
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else []
+
+# Allow all origins in development
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if os.environ.get('CSRF_TRUSTED_ORIGINS') else []
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
+
+# DRF Spectacular Configuration (API Documentation)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Trendify API',
+    'DESCRIPTION': 'Tech trend aggregation and analysis API - Track emerging technologies across GitHub, Hacker News, Reddit, and Stack Overflow',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+}
+
+
+# Security Settings for Production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True') == 'True'
+    CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True') == 'True'
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'True') == 'True'
+    SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'True') == 'True'
+
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Celery Configuration
+# https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html
+
+# Celery Broker Configuration
+# Use REDIS_URL for hosted Redis (e.g., Redis Cloud, Upstash, etc.)
+# Falls back to local Redis for development if REDIS_URL is not set
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', REDIS_URL)
+
+# Redis connection pool settings for hosted Redis
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_POOL_LIMIT = 10
+
+# SSL/TLS Configuration for rediss:// URLs (e.g., Upstash, Redis Cloud)
+import ssl
+if REDIS_URL.startswith('rediss://'):
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+
+# Celery Task Configuration
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+
+# Celery Beat Configuration (for periodic tasks)
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Celery Beat Schedule (Cron jobs)
+# Run the full daily pipeline once per day at 2 AM UTC
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'fetch-all-platforms-daily': {
+        'task': 'api.tasks.full_pipeline_daily',
+        'schedule': crontab(hour=2, minute=0),  # Run at 2:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 12,  # Task expires after 12 hours if not executed
+        }
+    },
+    'calculate-daily-metrics': {
+        'task': 'api.tasks.calculate_daily_metrics',
+        'schedule': crontab(hour=3, minute=0),  # Run at 3:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'check-watchlist-alerts': {
+        'task': 'api.tasks.check_watchlist_alerts',
+        'schedule': crontab(hour=4, minute=0),  # Run at 4:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'resolve-topics-to-entities': {
+        'task': 'api.tasks.resolve_topics_to_entities',
+        'schedule': crontab(hour=5, minute=0),  # Run at 5:00 AM UTC daily
+        'options': {
+            'expires': 3600 * 6,
+        }
+    },
+    'llm-entity-cleanup': {
+        'task': 'api.tasks.llm_entity_cleanup',
+        'schedule': crontab(hour='*/6'),  # Run every 6 hours
+        'kwargs': {'max_keywords': 50},
+        'options': {
+            'expires': 3600 * 3,
+        }
+    },
+    'cleanup-old-data-weekly': {
+        'task': 'api.tasks.cleanup_old_data',
+        'schedule': crontab(hour=1, minute=0, day_of_week=0),  # Run at 1:00 AM every Sunday
+        'kwargs': {'days': 90},
+        'options': {
+            'expires': 3600 * 12,
+        }
+    },
+}

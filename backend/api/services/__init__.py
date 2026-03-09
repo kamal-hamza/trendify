@@ -1,0 +1,1 @@
+# Services module for Trendify data fetching and processing
