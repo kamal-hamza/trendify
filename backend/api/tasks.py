@@ -140,14 +140,23 @@ def calculate_daily_metrics(date=None, topic_id=None):
         # Calculate momentum (change in mentions)
         momentum_score = 0.0
         engagement_momentum = 0.0
+        growth_rate = 0.0
 
         if previous_metric:
             momentum_score = total_mentions - previous_metric.total_mentions
             engagement_momentum = total_engagement - previous_metric.total_engagement
+            
+            # Calculate growth rate (percentage change)
+            if previous_metric.total_mentions > 0:
+                growth_rate = (total_mentions - previous_metric.total_mentions) / previous_metric.total_mentions
+            else:
+                # If previous was 0, this is infinite growth - cap at 10.0 (1000%)
+                growth_rate = 10.0
         else:
             # First day, momentum is just the count
             momentum_score = float(total_mentions)
             engagement_momentum = float(total_engagement)
+            growth_rate = 1.0  # 100% growth from nothing
 
         # Create or update the daily metric
         metric, created = TopicDailyMetric.objects.update_or_create(
@@ -159,6 +168,7 @@ def calculate_daily_metrics(date=None, topic_id=None):
                 "avg_sentiment": avg_sentiment,
                 "momentum_score": momentum_score,
                 "engagement_momentum": engagement_momentum,
+                "growth_rate": growth_rate,
                 "source_breakdown": source_breakdown,
             },
         )
@@ -665,6 +675,116 @@ def fetch_github():
     Useful for more frequent updates or manual testing
     """
     return fetch_all_platforms(include_hn=False, include_reddit=False, include_github=True)
+
+
+@shared_task
+def fetch_emerging_platforms():
+    """
+    Fetch from emerging/early-stage platforms only
+    Focuses on new product launches, Show HN, Dev.to, rising Reddit posts, etc.
+    
+    This should run more frequently than the main pipeline (e.g., every 4-6 hours)
+    to catch emerging trends early.
+    
+    Returns:
+        Dictionary with fetch statistics
+    """
+    from django.conf import settings
+    import os
+    
+    try:
+        # Get Product Hunt token from settings or environment
+        ph_token = getattr(settings, 'PRODUCT_HUNT_API_TOKEN', None) or os.getenv('PRODUCT_HUNT_API_TOKEN')
+        
+        # Initialize aggregator
+        aggregator = TrendifyAggregator(product_hunt_token=ph_token)
+        
+        # Fetch from emerging sources
+        result = aggregator.fetch_emerging_only(
+            include_product_hunt=bool(ph_token),
+            include_devto=True,
+            include_show_hn=True,
+            include_reddit_rising=True,
+            include_github_new=True,
+            include_indiehackers=True,
+        )
+        
+        all_posts = result.get("all_posts", [])
+        discovered_topics = result.get("discovered_topics", [])
+        stats = result.get("stats", {})
+        
+        # Save posts to database
+        saved_count = 0
+        skipped_count = 0
+        topics_created = 0
+        mentions_created = 0
+        
+        for post_data in all_posts:
+            try:
+                external_id = post_data.get("external_id")
+                
+                # Skip if post already exists
+                if Post.objects.filter(external_id=external_id).exists():
+                    skipped_count += 1
+                    continue
+                
+                # Create post
+                post = Post.objects.create(
+                    external_id=external_id,
+                    source=post_data.get("source"),
+                    title=post_data.get("title"),
+                    url=post_data.get("url"),
+                    engagement_score=post_data.get("score", 0),
+                    comment_count=post_data.get("num_comments", 0),
+                    author=post_data.get("author", ""),
+                    content=post_data.get("content", ""),
+                    published_at=post_data.get("published_at"),
+                )
+                
+                saved_count += 1
+                
+                # Create topics from metadata
+                post_topics = post_data.get("topics", [])
+                for topic_name in post_topics:
+                    if topic_name and len(topic_name) > 1:
+                        topic, created = Topic.objects.get_or_create(
+                            name=topic_name,
+                            defaults={"category": "OTHER"},
+                        )
+                        if created:
+                            topics_created += 1
+                        
+                        # Create mention
+                        TopicMention.objects.get_or_create(
+                            topic=topic,
+                            post=post,
+                            defaults={"relevance_score": 1.0, "is_primary": False},
+                        )
+                        mentions_created += 1
+                
+                # Extract additional topics from content
+                extract_topics_from_post(post.id)
+                
+            except Exception as e:
+                print(f"Error saving emerging post: {e}")
+                continue
+        
+        print(f"Emerging fetch complete: {saved_count} saved, {skipped_count} skipped, {topics_created} topics created")
+        
+        return {
+            "total_fetched": len(all_posts),
+            "saved": saved_count,
+            "skipped": skipped_count,
+            "topics_created": topics_created,
+            "discovered_topics": len(discovered_topics),
+            "mentions_created": mentions_created,
+            "sources": stats["sources"],
+            "errors": stats["errors"],
+        }
+        
+    except Exception as exc:
+        print(f"Error in fetch_emerging_platforms: {exc}")
+        raise
 
 
 @shared_task

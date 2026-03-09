@@ -11,11 +11,13 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import RedditIcon from '@mui/icons-material/Reddit';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { formatDistanceToNow } from 'date-fns';
-import type { TrendingTopic } from '../services/api';
+import type { TrendingTopic, EmergingTopic } from '../services/api';
 
 interface TrendListProps {
-  trends: TrendingTopic[];
+  trends: (TrendingTopic | EmergingTopic)[];
   isLoading: boolean;
 }
 
@@ -69,6 +71,17 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
     return '#757575';
   };
 
+  const getGrowthColor = (rate: number): string => {
+    if (rate > 2) return '#f44336'; // >200% growth - red
+    if (rate > 1) return '#ff9800'; // >100% growth - orange
+    if (rate > 0.5) return '#4caf50'; // >50% growth - green
+    return '#757575';
+  };
+
+  const isEmergingTopic = (topic: TrendingTopic | EmergingTopic): topic is EmergingTopic => {
+    return 'avg_growth_rate' in topic;
+  };
+
   return (
     <Paper sx={{ p: 2 }}>
       <List disablePadding>
@@ -86,8 +99,17 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
           >
             {/* Header Row */}
             <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1 }}>
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                 {trend.name}
+                {isEmergingTopic(trend) && trend.is_new && (
+                  <Chip
+                    icon={<NewReleasesIcon />}
+                    label="NEW"
+                    size="small"
+                    color="success"
+                    sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'bold' }}
+                  />
+                )}
               </Typography>
               <Chip
                 label={trend.category_display}
@@ -99,16 +121,37 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
 
             {/* Metrics Row */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-              <Chip
-                icon={<TrendingUpIcon />}
-                label={`Momentum: ${trend.momentum_score.toFixed(1)}`}
-                size="small"
-                sx={{
-                  backgroundColor: getMomentumColor(trend.momentum_score),
-                  color: 'white',
-                  '& .MuiChip-icon': { color: 'white' },
-                }}
-              />
+              {isEmergingTopic(trend) ? (
+                <>
+                  <Chip
+                    icon={<RocketLaunchIcon />}
+                    label={`Growth: ${(trend.avg_growth_rate * 100).toFixed(0)}%`}
+                    size="small"
+                    sx={{
+                      backgroundColor: getGrowthColor(trend.avg_growth_rate),
+                      color: 'white',
+                      '& .MuiChip-icon': { color: 'white' },
+                    }}
+                  />
+                  <Chip
+                    label={`${trend.age_days} days old`}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                </>
+              ) : (
+                <Chip
+                  icon={<TrendingUpIcon />}
+                  label={`Momentum: ${trend.momentum_score.toFixed(1)}`}
+                  size="small"
+                  sx={{
+                    backgroundColor: getMomentumColor(trend.momentum_score),
+                    color: 'white',
+                    '& .MuiChip-icon': { color: 'white' },
+                  }}
+                />
+              )}
               <Chip
                 label={`${trend.total_mentions} mentions`}
                 size="small"
@@ -154,12 +197,16 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
               })}
             </Box>
 
-            {/* Peak Date */}
-            {trend.peak_date && (
+            {/* Peak/First Seen Date */}
+            {isEmergingTopic(trend) && trend.first_seen ? (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                First seen: {formatDistanceToNow(new Date(trend.first_seen), { addSuffix: true })}
+              </Typography>
+            ) : trend.peak_date ? (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                 Peak: {formatDistanceToNow(new Date(trend.peak_date), { addSuffix: true })}
               </Typography>
-            )}
+            ) : null}
           </ListItem>
         ))}
       </List>

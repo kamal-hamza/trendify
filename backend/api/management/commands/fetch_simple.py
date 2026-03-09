@@ -5,7 +5,9 @@ Use this for local development when Redis is not available
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.conf import settings
 from datetime import datetime
+import os
 
 from api.models import Post, Topic, TopicMention
 from api.services.fetchers import TrendifyAggregator
@@ -28,15 +30,24 @@ class Command(BaseCommand):
             default=30,
             help="Number of posts to fetch per platform (default: 30)",
         )
+        parser.add_argument(
+            "--mode",
+            type=str,
+            choices=["normal", "emerging"],
+            default="normal",
+            help="Fetch mode: 'normal' for established sources, 'emerging' for new/rising content (default: normal)",
+        )
 
     def handle(self, *args, **options):
         platform = options["platform"]
         limit = options["limit"]
+        mode = options["mode"]
 
         self.stdout.write("\n" + "=" * 70)
         self.stdout.write(self.style.SUCCESS("TRENDIFY SIMPLE DATA FETCHER"))
         self.stdout.write("=" * 70)
         self.stdout.write(f"\nPlatform: {platform.upper()}")
+        self.stdout.write(f"Mode: {mode.upper()}")
         self.stdout.write(f"Limit: {limit} posts per source\n")
 
         # Determine which platforms to fetch from
@@ -45,18 +56,48 @@ class Command(BaseCommand):
         include_github = platform in ["all", "github"]
 
         try:
+            # Get Product Hunt token from settings or environment
+            ph_token = getattr(settings, 'PRODUCT_HUNT_API_TOKEN', None) or os.getenv('PRODUCT_HUNT_API_TOKEN')
+            
             # Initialize aggregator
             self.stdout.write("Initializing aggregator...")
-            aggregator = TrendifyAggregator()
+            aggregator = TrendifyAggregator(product_hunt_token=ph_token)
 
-            # Fetch data
+            # Fetch data based on mode
             self.stdout.write("Fetching data from platforms...")
-            result = aggregator.fetch_all(
-                include_hn=include_hn,
-                include_reddit=include_reddit,
-                include_github=include_github,
-                use_topic_search=True,
-            )
+            
+            if mode == "emerging":
+                # Fetch from emerging sources
+                if platform != "all":
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "\n[Note] Emerging mode fetches from specific emerging sources. Platform filter may be ignored."
+                        )
+                    )
+                
+                result = aggregator.fetch_emerging_only(
+                    include_product_hunt=bool(ph_token),
+                    include_devto=True,
+                    include_show_hn=include_hn or platform == "all",
+                    include_reddit_rising=include_reddit or platform == "all",
+                    include_github_new=include_github or platform == "all",
+                    include_indiehackers=True,
+                )
+                
+                if not ph_token:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "\n[Warning] Product Hunt API token not found. Set PRODUCT_HUNT_API_TOKEN to fetch from Product Hunt."
+                        )
+                    )
+            else:
+                # Normal fetch
+                result = aggregator.fetch_all(
+                    include_hn=include_hn,
+                    include_reddit=include_reddit,
+                    include_github=include_github,
+                    use_topic_search=True,
+                )
 
             all_posts = result["all_posts"]
             discovered_topics = result.get("discovered_topics", [])
@@ -254,6 +295,11 @@ class Command(BaseCommand):
             self.stdout.write(
                 "     curl http://localhost:8000/api/topics/trending/?limit=10"
             )
+            if mode == "emerging":
+                self.stdout.write("\n  5. View emerging topics:")
+                self.stdout.write(
+                    "     curl http://localhost:8000/api/topics/emerging/?limit=10"
+                )
             self.stdout.write("=" * 70 + "\n")
 
         except Exception as e:

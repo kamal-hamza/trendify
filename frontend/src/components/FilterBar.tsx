@@ -7,9 +7,14 @@ import {
   TextField,
   InputAdornment,
   Paper,
+  ToggleButton,
+  ToggleButtonGroup,
+  Chip,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { useFilterStore } from '../store/filterStore';
 
 interface FilterBarProps {
@@ -17,7 +22,7 @@ interface FilterBarProps {
 }
 
 const FilterBar = ({ showSearch = true }: FilterBarProps) => {
-  const { source, category, days, search, setSource, setCategory, setDays, setSearch } =
+  const { source, category, days, search, mode, setSource, setCategory, setDays, setSearch, setMode } =
     useFilterStore();
 
   const sources = [
@@ -65,6 +70,12 @@ const FilterBar = ({ showSearch = true }: FilterBarProps) => {
     setSearch(event.target.value);
   };
 
+  const handleModeChange = (_event: React.MouseEvent<HTMLElement>, newMode: 'trending' | 'emerging' | null) => {
+    if (newMode !== null) {
+      setMode(newMode);
+    }
+  };
+
   return (
     <Paper
       elevation={0}
@@ -85,6 +96,30 @@ const FilterBar = ({ showSearch = true }: FilterBarProps) => {
           alignItems: 'center',
         }}
       >
+        {/* Mode Toggle */}
+        <ToggleButtonGroup
+          value={mode}
+          exclusive
+          onChange={handleModeChange}
+          size="small"
+          sx={{ flexShrink: 0 }}
+        >
+          <ToggleButton value="trending" aria-label="trending">
+            <TrendingUpIcon sx={{ mr: 0.5, fontSize: 18 }} />
+            Trending
+          </ToggleButton>
+          <ToggleButton value="emerging" aria-label="emerging">
+            <RocketLaunchIcon sx={{ mr: 0.5, fontSize: 18 }} />
+            Emerging
+            <Chip
+              label="New"
+              size="small"
+              color="success"
+              sx={{ ml: 0.5, height: 18, fontSize: '0.7rem' }}
+            />
+          </ToggleButton>
+        </ToggleButtonGroup>
+
         {/* Search Field */}
         {showSearch && (
           <TextField

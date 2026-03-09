@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { fetchTrendingTopics, fetchStats, refreshData } from '../services/api';
+import { fetchTrendingTopics, fetchEmergingTopics, fetchStats, refreshData } from '../services/api';
 import { useFilterStore } from '../store/filterStore';
 import FilterBar from './FilterBar';
 import TrendList from './TrendList';
@@ -18,7 +18,7 @@ import StatsPanel from './StatsPanel';
 
 const TrendDashboard = () => {
   const queryClient = useQueryClient();
-  const { source, category, days } = useFilterStore();
+  const { source, category, days, mode } = useFilterStore();
   const [refreshing, setRefreshing] = useState(false);
 
   // Build query params
@@ -29,14 +29,14 @@ const TrendDashboard = () => {
     return params;
   };
 
-  // Fetch trending topics
+  // Fetch trending or emerging topics based on mode
   const {
     data: trends = [],
     isLoading: trendsLoading,
     error: trendsError,
   } = useQuery({
-    queryKey: ['trending-topics', source, category, days],
-    queryFn: () => fetchTrendingTopics(buildParams()),
+    queryKey: ['topics', mode, source, category, days],
+    queryFn: () => mode === 'emerging' ? fetchEmergingTopics(buildParams()) : fetchTrendingTopics(buildParams()),
     refetchInterval: 60000, // Refetch every minute
   });
 
@@ -56,7 +56,7 @@ const TrendDashboard = () => {
     mutationFn: refreshData,
     onSuccess: () => {
       // Invalidate all queries to refetch data
-      queryClient.invalidateQueries({ queryKey: ['trending-topics'] });
+      queryClient.invalidateQueries({ queryKey: ['topics'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       setRefreshing(false);
     },
@@ -129,10 +129,12 @@ const TrendDashboard = () => {
         <Box>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom fontWeight="bold">
-              Trending Topics
+              {mode === 'emerging' ? 'Emerging Topics' : 'Trending Topics'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Sorted by momentum score (velocity of mentions over time)
+              {mode === 'emerging' 
+                ? 'New and fast-growing topics with high growth rates'
+                : 'Sorted by momentum score (velocity of mentions over time)'}
             </Typography>
             <TrendList trends={trends} isLoading={trendsLoading} />
           </Paper>
