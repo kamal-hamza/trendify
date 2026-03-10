@@ -30,8 +30,8 @@ const ProductDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'engagement' | 'recency'>('engagement');
   
-  // Use specific date instead of days range (default to Jan 30, 2026 - the latest date with data)
-  const [selectedDate, setSelectedDate] = useState('2026-01-30');
+  // Use specific date instead of days range (default to March 9, 2026 - the latest date with data)
+  const [selectedDate, setSelectedDate] = useState('2026-03-09');
   const [localSource, setLocalSource] = useState('all');
 
   // Build query params - fetch posts from selected date only
@@ -140,7 +140,7 @@ const ProductDashboard = () => {
 
       {/* Subtitle */}
       <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
-        Browse day-by-day trending products and projects from Product Hunt and Hacker News
+        Browse day-by-day trending products from Product Hunt, Hacker News, Dev.to, GitHub, Lobsters, and TAAFT
       </Typography>
 
       {/* Filters */}
@@ -162,6 +162,10 @@ const ProductDashboard = () => {
               <ToggleButton value="all">All</ToggleButton>
               <ToggleButton value="PRODUCT_HUNT">Product Hunt</ToggleButton>
               <ToggleButton value="HN">Hacker News</ToggleButton>
+              <ToggleButton value="DEVTO">Dev.to</ToggleButton>
+              <ToggleButton value="GITHUB_TRENDING">GitHub</ToggleButton>
+              <ToggleButton value="LOBSTERS">Lobsters</ToggleButton>
+              <ToggleButton value="TAAFT">AI Tools</ToggleButton>
             </ToggleButtonGroup>
           </Box>
 
@@ -206,7 +210,7 @@ const ProductDashboard = () => {
                 <IconButton 
                   size="small" 
                   onClick={goToNextDay}
-                  disabled={selectedDate >= '2026-01-30'}
+                  disabled={selectedDate >= '2026-03-09'}
                   title="Next day"
                   sx={{ 
                     borderRadius: 0,
@@ -221,8 +225,8 @@ const ProductDashboard = () => {
               <Button
                 size="small"
                 variant="outlined"
-                onClick={() => setSelectedDate('2026-01-30')}
-                disabled={selectedDate === '2026-01-30'}
+                onClick={() => setSelectedDate('2026-03-09')}
+                disabled={selectedDate === '2026-03-09'}
                 sx={{ minWidth: 'auto', px: 1.5 }}
               >
                 Latest

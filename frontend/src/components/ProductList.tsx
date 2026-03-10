@@ -25,10 +25,14 @@ interface ProductListProps {
 const sourceConfig: Record<string, { icon: any; color: string; label: string }> = {
   HN: { icon: TrendingUpIcon, color: '#ff6600', label: 'Hacker News' },
   GITHUB: { icon: GitHubIcon, color: '#24292e', label: 'GitHub' },
+  GITHUB_TRENDING: { icon: GitHubIcon, color: '#24292e', label: 'GitHub Trending' },
   REDDIT_LOCALLLAMA: { icon: RedditIcon, color: '#ff4500', label: 'r/LocalLLaMA' },
   REDDIT_MACHINELEARNING: { icon: RedditIcon, color: '#ff4500', label: 'r/MachineLearning' },
   REDDIT_PROGRAMMING: { icon: RedditIcon, color: '#ff4500', label: 'r/programming' },
   PRODUCT_HUNT: { icon: TrendingUpIcon, color: '#da552f', label: 'Product Hunt' },
+  DEVTO: { icon: TrendingUpIcon, color: '#0a0a0a', label: 'Dev.to' },
+  LOBSTERS: { icon: TrendingUpIcon, color: '#990000', label: 'Lobste.rs' },
+  TAAFT: { icon: TrendingUpIcon, color: '#6366f1', label: 'TAAFT' },
 };
 
 const ProductList = ({ products, isLoading }: ProductListProps) => {
