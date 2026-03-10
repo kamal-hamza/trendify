@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { Container, Box } from '@mui/material';
 import TrendDashboard from './components/TrendDashboard';
+import ProductDashboard from './components/ProductDashboard';
 
 // Create React Query client with default options
 const queryClient = new QueryClient({
@@ -61,7 +62,8 @@ function App() {
           <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
             <Container maxWidth="xl" sx={{ py: 4 }}>
               <Routes>
-                <Route path="/" element={<TrendDashboard />} />
+                <Route path="/" element={<ProductDashboard />} />
+                <Route path="/topics" element={<TrendDashboard />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Container>

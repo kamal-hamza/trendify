@@ -156,6 +156,7 @@ class PostListSerializer(serializers.ModelSerializer):
 
     source_display = serializers.CharField(source="get_source_display", read_only=True)
     primary_topic = serializers.SerializerMethodField()
+    topic_names = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -172,12 +173,17 @@ class PostListSerializer(serializers.ModelSerializer):
             "published_at",
             "author",
             "primary_topic",
+            "topic_names",
         ]
 
     def get_primary_topic(self, obj):
         """Get the primary topic name if exists"""
         primary_mention = obj.mentions.filter(is_primary=True).first()
         return primary_mention.topic.name if primary_mention else None
+
+    def get_topic_names(self, obj):
+        """Get list of all topic names (native tags) for this post"""
+        return list(obj.topics.values_list("name", flat=True))
 
 
 class TopicDailyMetricSerializer(serializers.ModelSerializer):

@@ -897,6 +897,10 @@ class DevToFetcher(BaseFetcher):
 class KeywordExtractor:
     """
     Extract trending keywords from post titles using word frequency analysis
+    
+    NOTE: This class is currently DISABLED in the main pipeline.
+    We are focusing on native tags from platforms (Product Hunt tags, GitHub topics, etc.)
+    instead of extracting keywords from text.
     """
 
     def __init__(self):
@@ -1290,6 +1294,9 @@ class TrendifyAggregator:
     def extract_keywords(self, posts: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
         """
         Extract trending keywords from posts
+        
+        NOTE: This method is DISABLED in the main pipeline.
+        We are focusing on native tags from platforms instead.
 
         Args:
             posts: List of post dictionaries

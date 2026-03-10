@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Sum, Avg, Max, Min, Q, F
 from django.utils import timezone
-from datetime import timedelta, date
+from datetime import datetime, timedelta, date
 import logging
 
 from .models import (
@@ -163,189 +163,421 @@ class TopicViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
+
     @action(detail=False, methods=["get"])
-    def emerging(self, request):
+    def emerging_products(self, request):
         """
-        Get emerging/fast-growing topics
-        Filters for:
-        - Recently discovered topics (created within last 7 days)
-        - High growth rate (>50% growth)
-        - Topics gaining momentum
-        - Excludes generic/common topics
+        Get emerging products by extracting product names from post titles
+        Returns actual product launches, not generic categories
         
         Query params:
-        - days: Number of days to analyze (default: 7)
-        - limit: Number of results (default: 20)
-        - category: Filter by category
-        - min_growth: Minimum growth rate (default: 0.5 = 50%)
-        - max_age_days: Maximum age of topic (default: 30)
-        - min_mentions: Minimum mentions to avoid noise (default: 3)
+        - source: Filter by source (PRODUCT_HUNT, HN, or both)
+        - days: Number of days to look back (default: 60)
+        - limit: Number of results (default: 40)
+        - min_engagement: Minimum engagement score (default: 0)
         """
         try:
-            days = int(request.query_params.get("days", 7))
-            limit = int(request.query_params.get("limit", 20))
-            category = request.query_params.get("category")
-            min_growth = float(request.query_params.get("min_growth", 0.5))
-            max_age_days = int(request.query_params.get("max_age_days", 30))
-            min_mentions = int(request.query_params.get("min_mentions", 3))
+            source = request.query_params.get("source", "all")
+            days = int(request.query_params.get("days", 60))
+            limit = int(request.query_params.get("limit", 40))
+            min_engagement = int(request.query_params.get("min_engagement", 0))
             
             # Get date range
             end_date = date.today()
             start_date = end_date - timedelta(days=days)
-            age_cutoff = timezone.now() - timedelta(days=max_age_days)
             
-            # Filter out generic/common topic names
-            generic_topics = [
-                'ai', 'python', 'javascript', 'c', 'discussion', 'webdev',
-                'programming', 'artificial', 'code', 'project', 'software',
-                'open', 'technology', 'data', 'other', 'tutorial', 'guide',
-                'help', 'question', 'announcement', 'news', 'update',
-                'and the', 'the', 'a', 'an', 'for', 'with', 'to', 'of',
-                'artificial intelligence', 'machine learning', 'deep learning',
-                'web development', 'software engineering', 'computer science',
-            ]
-            
-            # Build query for recently created topics
-            topics_query = Topic.objects.filter(
-                is_active=True,
-                created_at__gte=age_cutoff,
-            ).exclude(
-                name__iregex=r'^(show hn|launch|ban|cli|open-source|productivity)$'
+            # Build post query
+            posts_query = Post.objects.filter(
+                created_at__gte=timezone.make_aware(
+                    datetime.combine(start_date, datetime.min.time())
+                ),
+                created_at__lte=timezone.make_aware(
+                    datetime.combine(end_date, datetime.max.time())
+                ),
+                engagement_score__gte=min_engagement,
             )
             
-            # Exclude very generic single-word topics
-            for generic in generic_topics:
-                topics_query = topics_query.exclude(name__iexact=generic)
-            
-            if category:
-                topics_query = topics_query.filter(category=category)
-            
-            # Get metrics for these topics
-            metrics_query = TopicDailyMetric.objects.filter(
-                date__gte=start_date,
-                date__lte=end_date,
-                topic__in=topics_query,
-            )
-            
-            # Aggregate metrics by topic with growth rate
-            emerging_data = (
-                metrics_query.values(
-                    "topic__id",
-                    "topic__name",
-                    "topic__category",
-                    "topic__created_at",
+            # Filter by source
+            if source == "PRODUCT_HUNT":
+                posts_query = posts_query.filter(source="PRODUCT_HUNT")
+            elif source == "HN":
+                posts_query = posts_query.filter(source="HN", title__icontains="show hn")
+            else:
+                # Both Product Hunt and Show HN
+                posts_query = posts_query.filter(
+                    Q(source="PRODUCT_HUNT") | Q(source="HN", title__icontains="show hn")
                 )
-                .annotate(
-                    total_mentions=Sum("total_mentions"),
-                    total_engagement=Sum("total_engagement"),
-                    avg_sentiment=Avg("avg_sentiment"),
-                    momentum_score=Avg("momentum_score"),
-                    engagement_momentum=Avg("engagement_momentum"),
-                    avg_growth_rate=Avg("growth_rate"),
-                    max_growth_rate=Max("growth_rate"),
-                    recent_posts_count=Count("topic__posts"),
-                    peak_date=Max("date"),
-                    first_seen=Min("date"),
-                )
-                .filter(
-                    avg_growth_rate__gte=min_growth,
-                    total_mentions__gte=min_mentions,
-                )
-                .order_by("-total_mentions", "-avg_growth_rate", "-momentum_score")[:limit * 5]
-            )
             
-            # Enrich with source breakdown and calculate emergence score
-            results = []
-            for item in emerging_data:
-                topic_id = item["topic__id"]
-                topic_name = item["topic__name"]
+            # Order by engagement
+            posts = posts_query.order_by("-engagement_score")[:limit * 2]
+            
+            # Extract product names from titles
+            products = []
+            seen_products = set()
+            
+            for post in posts:
+                title = post.title
+                product_name = None
                 
-                # Skip if topic name is too short or too generic
-                if len(topic_name) <= 2 or topic_name.lower() in ['and', 'the', 'or', 'but']:
+                # Extract product name from title
+                if post.source == "PRODUCT_HUNT":
+                    # Product Hunt format: "ProductName - Description"
+                    if " - " in title:
+                        product_name = title.split(" - ")[0].strip()
+                    else:
+                        product_name = title.split(":")[0].strip()
+                elif "Show HN:" in title:
+                    # Show HN format: "Show HN: ProductName - Description"
+                    parts = title.split("Show HN:", 1)
+                    if len(parts) > 1:
+                        product_part = parts[1].strip()
+                        # Extract product name before dash or em-dash
+                        product_name = product_part.split("–")[0].split("-")[0].strip()
+                
+                # Skip if no product name or already seen
+                if not product_name or len(product_name) < 3 or product_name in seen_products:
                     continue
                 
-                # Get source breakdown
-                source_metrics = (
-                    TopicDailyMetric.objects.filter(
-                        topic_id=topic_id,
+                seen_products.add(product_name)
+                
+                # Get topic metrics if they exist
+                topic_metrics = None
+                for mention in post.mentions.all()[:1]:
+                    topic = mention.topic
+                    metrics = TopicDailyMetric.objects.filter(
+                        topic=topic,
                         date__gte=start_date,
                         date__lte=end_date,
+                    ).aggregate(
+                        total_mentions=Sum("total_mentions"),
+                        avg_growth=Avg("growth_rate"),
+                        max_growth=Max("growth_rate"),
                     )
-                    .values("source_breakdown")
-                    .first()
-                )
+                    if metrics["total_mentions"]:
+                        topic_metrics = {
+                            "topic_id": topic.id,
+                            "topic_name": topic.name,
+                            "total_mentions": metrics["total_mentions"],
+                            "avg_growth": round(metrics["avg_growth"] or 0, 2),
+                            "max_growth": round(metrics["max_growth"] or 0, 2),
+                        }
+                    break
                 
-                # Calculate age in days
-                created_at = item["topic__created_at"]
-                age_days = (timezone.now() - created_at).days
+                products.append({
+                    "product_name": product_name,
+                    "source": post.source,
+                    "engagement_score": post.engagement_score,
+                    "comment_count": post.comment_count,
+                    "url": post.url,
+                    "published_at": post.published_at,
+                    "created_at": post.created_at,
+                    "title": post.title,
+                    "metrics": topic_metrics,
+                })
                 
-                # Calculate emergence score (custom scoring)
-                # Factors: mentions, growth rate, sentiment, source diversity, source quality
-                sources = source_metrics.get("source_breakdown", {}) if source_metrics else {}
-                source_count = len(sources)
-                
-                # Boost score for emerging-focused sources
-                source_quality_boost = 0
-                if 'PRODUCT_HUNT' in sources:
-                    source_quality_boost += 50  # Product Hunt = new products
-                if 'HN' in sources and 'Show HN' in topic_name:
-                    source_quality_boost += 40  # Show HN = launches
-                if 'DEVTO' in sources:
-                    source_quality_boost += 20  # Dev.to = developer content
-                if 'GITHUB' in sources and item["total_mentions"] <= 10:
-                    source_quality_boost += 30  # New GitHub repos
-                
-                # Penalize if topic name is very generic or short
-                name_penalty = 0
-                if len(topic_name) <= 4:
-                    name_penalty = 20
-                
-                emergence_score = (
-                    item["total_mentions"] * 0.25 +
-                    item["avg_growth_rate"] * 100 * 0.20 +
-                    (item["avg_sentiment"] + 1) * 50 * 0.15 +
-                    source_count * 20 * 0.15 +
-                    source_quality_boost * 0.25 -
-                    name_penalty
-                )
-                
-                results.append(
-                    {
-                        "id": item["topic__id"],
-                        "name": item["topic__name"],
-                        "category": item["topic__category"],
-                        "category_display": dict(Topic.CATEGORY_CHOICES).get(
-                            item["topic__category"], item["topic__category"]
-                        ),
-                        "total_mentions": item["total_mentions"] or 0,
-                        "total_engagement": item["total_engagement"] or 0,
-                        "avg_sentiment": round(item["avg_sentiment"] or 0, 2),
-                        "momentum_score": round(item["momentum_score"] or 0, 2),
-                        "engagement_momentum": round(item["engagement_momentum"] or 0, 2),
-                        "avg_growth_rate": round(item["avg_growth_rate"] or 0, 2),
-                        "max_growth_rate": round(item["max_growth_rate"] or 0, 2),
-                        "recent_posts_count": item["recent_posts_count"],
-                        "sources": source_metrics["source_breakdown"]
-                        if source_metrics
-                        else {},
-                        "peak_date": item["peak_date"],
-                        "first_seen": item["first_seen"],
-                        "age_days": age_days,
-                        "is_new": age_days <= 7,
-                        "emergence_score": round(emergence_score, 2),
-                    }
-                )
+                if len(products) >= limit:
+                    break
             
-            # Sort by emergence score and limit
-            results = sorted(results, key=lambda x: x["emergence_score"], reverse=True)[:limit]
-            
-            serializer = TrendingTopicSerializer(results, many=True)
-            return Response(serializer.data)
+            return Response(products)
             
         except Exception as e:
-            logger.error(f"Error getting emerging topics: {e}")
+            logger.error(f"Error getting emerging products: {e}")
             return Response(
-                {"error": "Failed to retrieve emerging topics"},
+                {"error": "Failed to retrieve emerging products"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+
+    @action(detail=False, methods=["get"])
+    def product_launches(self, request):
+        """
+        Get actual product launches from Product Hunt and Show HN
+        Extracts product names from post titles with better parsing
+        
+        Query params:
+        - days: Number of days to look back (default: 60)
+        - limit: Number of results (default: 40)
+        - min_engagement: Minimum engagement score (default: 0)
+        - source: Filter by source (PRODUCT_HUNT, HN, or all)
+        """
+        try:
+            import re
+            from collections import defaultdict
+            
+            days = int(request.query_params.get("days", 60))
+            limit = int(request.query_params.get("limit", 40))
+            min_engagement = int(request.query_params.get("min_engagement", 0))
+            source_filter = request.query_params.get("source", "all")
+            
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+            
+            # Build post query
+            posts_query = Post.objects.filter(
+                published_at__gte=start_date,
+                published_at__lte=end_date,
+                engagement_score__gte=min_engagement,
+            )
+            
+            # Filter by source
+            if source_filter == "PRODUCT_HUNT":
+                posts_query = posts_query.filter(source="PRODUCT_HUNT")
+            elif source_filter == "HN":
+                posts_query = posts_query.filter(source="HN")
+            else:
+                posts_query = posts_query.filter(source__in=["PRODUCT_HUNT", "HN"])
+            
+            posts = posts_query.prefetch_related('topics').order_by('-engagement_score', '-comment_count')[:limit * 2]
+            
+            def extract_product_name(title, source):
+                """Extract likely product name from post title"""
+                if source == 'HN':
+                    # Show HN: ProductName - description
+                    match = re.match(r'Show HN:\s*([A-Z][a-zA-Z0-9\s\.]+?)(?:\s*[-–—:]|\s*\(|$)', title)
+                    if match:
+                        return match.group(1).strip()
+                elif source == 'PRODUCT_HUNT':
+                    # Usually the title IS the product name or "ProductName - description"
+                    match = re.match(r'^([A-Z][a-zA-Z0-9\s\.]+?)(?:\s*[-–—:]|\s*\(|$)', title)
+                    if match:
+                        return match.group(1).strip()
+                return None
+            
+            # Extract and aggregate products
+            product_stats = defaultdict(lambda: {
+                'mentions': 0,
+                'total_engagement': 0,
+                'total_comments': 0,
+                'sources': set(),
+                'first_seen': None,
+                'last_seen': None,
+                'posts': [],
+            })
+            
+            for post in posts:
+                product_name = extract_product_name(post.title, post.source)
+                if product_name and len(product_name) > 2 and len(product_name) < 40:
+                    key = product_name
+                    product_stats[key]['mentions'] += 1
+                    product_stats[key]['total_engagement'] += post.engagement_score
+                    product_stats[key]['total_comments'] += post.comment_count
+                    product_stats[key]['sources'].add(post.source)
+                    
+                    pub_date = post.published_at.date()
+                    if product_stats[key]['first_seen'] is None or pub_date < product_stats[key]['first_seen']:
+                        product_stats[key]['first_seen'] = pub_date
+                    if product_stats[key]['last_seen'] is None or pub_date > product_stats[key]['last_seen']:
+                        product_stats[key]['last_seen'] = pub_date
+                    
+                    # Store post info
+                    if len(product_stats[key]['posts']) < 3:  # Keep top 3 posts per product
+                        product_stats[key]['posts'].append({
+                            'title': post.title,
+                            'url': post.url,
+                            'engagement': post.engagement_score,
+                            'comments': post.comment_count,
+                            'published_at': post.published_at,
+                            'source': post.source,
+                        })
+            
+            # Sort by engagement and mentions
+            sorted_products = sorted(
+                product_stats.items(),
+                key=lambda x: (x[1]['total_engagement'], x[1]['mentions']),
+                reverse=True
+            )[:limit]
+            
+            results = []
+            for name, stats in sorted_products:
+                results.append({
+                    'product_name': name,
+                    'mentions': stats['mentions'],
+                    'total_engagement': stats['total_engagement'],
+                    'total_comments': stats['total_comments'],
+                    'sources': list(stats['sources']),
+                    'first_seen': stats['first_seen'],
+                    'last_seen': stats['last_seen'],
+                    'posts': stats['posts'],
+                })
+            
+            return Response({
+                'count': len(results),
+                'days': days,
+                'results': results
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting product launches: {e}")
+            return Response(
+                {"error": "Failed to retrieve product launches"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+
+    @action(detail=False, methods=["get"])
+    def true_products(self, request):
+        """
+        Get actual product/project names extracted from Product Hunt and Show HN posts
+        Ranks by velocity, engagement, and recency
+        
+        Query params:
+        - days: Number of days to look back (default: 60)
+        - limit: Number of results (default: 50)
+        - min_engagement: Minimum engagement score (default: 100)
+        - source: Filter by source (PRODUCT_HUNT, HN, or all)
+        """
+        try:
+            import re
+            from collections import defaultdict
+            
+            days = int(request.query_params.get("days", 60))
+            limit = int(request.query_params.get("limit", 50))
+            min_engagement = int(request.query_params.get("min_engagement", 100))
+            source_filter = request.query_params.get("source", "all")
+            
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+            
+            # Get posts from product-focused sources
+            posts_query = Post.objects.filter(
+                published_at__gte=start_date,
+                published_at__lte=end_date,
+                engagement_score__gte=min_engagement,
+            )
+            
+            if source_filter == "PRODUCT_HUNT":
+                posts_query = posts_query.filter(source="PRODUCT_HUNT")
+            elif source_filter == "HN":
+                posts_query = posts_query.filter(source="HN")
+            else:
+                posts_query = posts_query.filter(source__in=["PRODUCT_HUNT", "HN"])
+            
+            posts = posts_query.order_by('-engagement_score')
+            
+            def extract_product_name(title, source):
+                """Extract product name from post title"""
+                if source == 'HN':
+                    match = re.match(r'Show HN:\s*([A-Z][a-zA-Z0-9\s\.]+?)(?:\s*[-–—:]|\s*\(|$)', title)
+                    if match:
+                        name = match.group(1).strip()
+                        # Clean up common trailing words
+                        name = re.sub(r'\s+(is|was|has|does|can|will|now|the|a)\s*$', '', name, flags=re.IGNORECASE)
+                        return name
+                elif source == 'PRODUCT_HUNT':
+                    match = re.match(r'^([A-Z][a-zA-Z0-9\s\.]+?)(?:\s*[-–—:]|\s*\(|$)', title)
+                    if match:
+                        name = match.group(1).strip()
+                        name = re.sub(r'\s+(is|was|has|does|can|will|now|the|a)\s*$', '', name, flags=re.IGNORECASE)
+                        return name
+                return None
+            
+            # Aggregate products with velocity data
+            product_data = defaultdict(lambda: {
+                'posts': [],
+                'total_engagement': 0,
+                'total_comments': 0,
+                'sources': set(),
+                'first_seen': None,
+                'last_seen': None,
+                'topic_ids': set(),
+                'velocity': 0.0,
+                'max_momentum': 0.0,
+            })
+            
+            for post in posts:
+                product_name = extract_product_name(post.title, post.source)
+                if not product_name or len(product_name) < 3 or len(product_name) > 40:
+                    continue
+                
+                key = product_name
+                pub_date = post.published_at.date()
+                
+                product_data[key]['total_engagement'] += post.engagement_score
+                product_data[key]['total_comments'] += post.comment_count
+                product_data[key]['sources'].add(post.source)
+                
+                if product_data[key]['first_seen'] is None or pub_date < product_data[key]['first_seen']:
+                    product_data[key]['first_seen'] = pub_date
+                if product_data[key]['last_seen'] is None or pub_date > product_data[key]['last_seen']:
+                    product_data[key]['last_seen'] = pub_date
+                
+                # Store post info (keep top 3)
+                if len(product_data[key]['posts']) < 3:
+                    product_data[key]['posts'].append({
+                        'title': post.title,
+                        'url': post.url,
+                        'engagement': post.engagement_score,
+                        'comments': post.comment_count,
+                        'published_at': post.published_at,
+                        'source': post.source,
+                    })
+                
+                # Collect topic IDs for velocity lookup
+                for mention in post.mentions.all():
+                    product_data[key]['topic_ids'].add(mention.topic_id)
+            
+            # Calculate velocity scores from topic metrics
+            for product_name, data in product_data.items():
+                if data['topic_ids']:
+                    # Get velocity metrics for associated topics
+                    metrics = TopicDailyMetric.objects.filter(
+                        topic_id__in=data['topic_ids'],
+                        date__gte=start_date.date(),
+                        date__lte=end_date.date(),
+                    ).aggregate(
+                        total_velocity=Sum('momentum_score'),
+                        max_momentum=Max('momentum_score'),
+                        avg_growth=Avg('growth_rate'),
+                    )
+                    data['velocity'] = metrics['total_velocity'] or 0.0
+                    data['max_momentum'] = metrics['max_momentum'] or 0.0
+                    data['avg_growth'] = metrics['avg_growth'] or 0.0
+            
+            # Calculate composite scores and prepare results
+            results = []
+            for product_name, data in product_data.items():
+                # Composite score: velocity + engagement + recency
+                days_since_first = (date.today() - data['first_seen']).days if data['first_seen'] else days
+                recency_factor = 1.0 + (1.0 - (days_since_first / days))  # More recent = higher score
+                
+                composite_score = (
+                    data['velocity'] * 3.0 +
+                    data['max_momentum'] * 2.0 +
+                    (data['total_engagement'] / 100.0) +
+                    recency_factor * 5.0
+                )
+                
+                results.append({
+                    'product_name': product_name,
+                    'total_engagement': data['total_engagement'],
+                    'total_comments': data['total_comments'],
+                    'sources': list(data['sources']),
+                    'first_seen': data['first_seen'],
+                    'last_seen': data['last_seen'],
+                    'velocity': round(data['velocity'], 2),
+                    'max_momentum': round(data['max_momentum'], 2),
+                    'avg_growth': round(data.get('avg_growth', 0.0), 2),
+                    'score': round(composite_score, 2),
+                    'posts': data['posts'],
+                })
+            
+            # Sort by composite score
+            results.sort(key=lambda x: x['score'], reverse=True)
+            results = results[:limit]
+            
+            return Response({
+                'count': len(results),
+                'days': days,
+                'results': results
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting true products: {e}")
+            return Response(
+                {"error": "Failed to retrieve true products"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -517,16 +749,32 @@ class PostViewSet(viewsets.ReadOnlyModelViewSet):
         Get top posts by engagement
         Query params:
         - limit: Number of results (default: 20)
-        - days: Last N days (default: 7)
+        - days: Last N days (default: 7) - ignored if 'date' is provided
+        - date: Specific date (YYYY-MM-DD format) to fetch posts from
         - source: Filter by source
         """
         try:
             limit = int(request.query_params.get("limit", 20))
-            days = int(request.query_params.get("days", 7))
             source = request.query_params.get("source")
+            specific_date = request.query_params.get("date")
 
-            since = timezone.now() - timedelta(days=days)
-            queryset = Post.objects.filter(published_at__gte=since)
+            # If specific date is provided, filter by that date
+            if specific_date:
+                try:
+                    # Parse the date string (YYYY-MM-DD)
+                    from datetime import datetime
+                    target_date = datetime.strptime(specific_date, "%Y-%m-%d").date()
+                    queryset = Post.objects.filter(published_at__date=target_date)
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid date format. Use YYYY-MM-DD"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                # Fall back to days range
+                days = int(request.query_params.get("days", 7))
+                since = timezone.now() - timedelta(days=days)
+                queryset = Post.objects.filter(published_at__gte=since)
 
             if source:
                 queryset = queryset.filter(source=source)

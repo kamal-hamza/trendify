@@ -562,8 +562,8 @@ def fetch_all_platforms(
                     published_at=post_data["published_at"],
                 )
 
-                # Queue sentiment analysis for this post
-                calculate_sentiment_score.delay(post.id)
+                # Sentiment analysis disabled - focusing on native tags only
+                # calculate_sentiment_score.delay(post.id)
 
                 saved_count += 1
 
@@ -586,17 +586,17 @@ def fetch_all_platforms(
             if created:
                 topics_created += 1
         
-        # Also extract keywords as backup topics
-        keywords = aggregator.extract_keywords(all_posts)
-        for keyword, count in keywords[:10]:  # Limit to top 10 keywords
-            if keyword not in topic_map:
-                topic, created = Topic.objects.get_or_create(
-                    name=keyword,
-                    defaults={"category": "OTHER", "is_active": True},
-                )
-                topic_map[keyword] = topic
-                if created:
-                    topics_created += 1
+        # Keyword extraction DISABLED - using native tags only (from Product Hunt, GitHub, etc.)
+        # keywords = aggregator.extract_keywords(all_posts)
+        # for keyword, count in keywords[:10]:  # Limit to top 10 keywords
+        #     if keyword not in topic_map:
+        #         topic, created = Topic.objects.get_or_create(
+        #             name=keyword,
+        #             defaults={"category": "OTHER", "is_active": True},
+        #         )
+        #         topic_map[keyword] = topic
+        #         if created:
+        #             topics_created += 1
 
         # Create TopicMentions for posts with explicit topics
         mentions_created = 0
@@ -624,15 +624,15 @@ def fetch_all_platforms(
             except Post.DoesNotExist:
                 continue
         
-        # Queue additional topic extraction for all posts (to catch keywords)
-        new_post_ids = Post.objects.filter(
-            external_id__in=[
-                f"{p['source']}:{p['external_id']}" for p in all_posts
-            ]
-        ).values_list("id", flat=True)
+        # Topic extraction disabled - using native tags only
+        # new_post_ids = Post.objects.filter(
+        #     external_id__in=[
+        #         f"{p['source']}:{p['external_id']}" for p in all_posts
+        #     ]
+        # ).values_list("id", flat=True)
 
-        for post_id in new_post_ids:
-            extract_topics_from_post.delay(post_id)
+        # for post_id in new_post_ids:
+        #     extract_topics_from_post.delay(post_id)
 
         return {
             "total_fetched": stats["total_posts"],
@@ -762,8 +762,8 @@ def fetch_emerging_platforms():
                         )
                         mentions_created += 1
                 
-                # Extract additional topics from content
-                extract_topics_from_post(post.id)
+                # Topic extraction disabled - using native tags only
+                # extract_topics_from_post(post.id)
                 
             except Exception as e:
                 print(f"Error saving emerging post: {e}")
@@ -791,15 +791,16 @@ def fetch_emerging_platforms():
 def full_pipeline_daily():
     """
     Complete daily pipeline:
-    1. Fetch data from all platforms
-    2. Calculate sentiment scores
-    3. Extract topics
-    4. Calculate daily metrics
-    5. Check watchlist alerts
-    6. Generate daily report
+    1. Fetch data from all platforms (using native tags only)
+    2. Calculate daily metrics
+    3. Check watchlist alerts
+    4. Generate daily report
 
     This is the main scheduled task that should run once per day.
     Configure in django-celery-beat to run at a specific time (e.g., 2 AM).
+    
+    NOTE: AI tasks (sentiment analysis, topic extraction, embeddings) are disabled
+    to focus on native tags from platforms (Product Hunt tags, GitHub topics, etc.)
     """
     from celery import chain
 
@@ -830,8 +831,13 @@ def full_pipeline_daily():
 # =============================================================================
 
 
-@shared_task
-def generate_embeddings_for_topics(topic_ids=None):
+# =============================================================================
+# AI/EMBEDDING TASKS - DISABLED
+# These tasks are commented out to focus on native tags only
+# =============================================================================
+
+# @shared_task
+def generate_embeddings_for_topics_DISABLED(topic_ids=None):
     """
     Generate vector embeddings for topics for semantic similarity matching.
 
@@ -876,8 +882,8 @@ def generate_embeddings_for_topics(topic_ids=None):
         return 0
 
 
-@shared_task
-def resolve_topics_to_entities(topic_ids=None, similarity_threshold=0.85):
+# @shared_task
+def resolve_topics_to_entities_DISABLED(topic_ids=None, similarity_threshold=0.85):
     """
     Use vector clustering to resolve topics to entities.
     This finds topics that are semantically similar and groups them.
@@ -984,8 +990,8 @@ def resolve_topics_to_entities(topic_ids=None, similarity_threshold=0.85):
         return {"topics_processed": 0, "entities_created": 0, "links_created": 0}
 
 
-@shared_task
-def llm_entity_cleanup(max_keywords=50):
+# @shared_task
+def llm_entity_cleanup_DISABLED(max_keywords=50):
     """
     Background LLM task to clean up ambiguous entity mappings.
     Runs periodically (e.g., every 6 hours) to identify synonyms the vector math missed.
