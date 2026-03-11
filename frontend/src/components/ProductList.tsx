@@ -1,12 +1,12 @@
 import {
   List,
   ListItem,
-  Paper,
   Typography,
   Box,
   Chip,
   Link as MuiLink,
   Skeleton,
+  Stack,
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GitHubIcon from '@mui/icons-material/GitHub';
@@ -38,9 +38,9 @@ const sourceConfig: Record<string, { icon: any; color: string; label: string }> 
 const ProductList = ({ products, isLoading }: ProductListProps) => {
   if (isLoading) {
     return (
-      <Paper sx={{ p: 2 }}>
+      <Box sx={{ p: 2.5 }}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <Box key={i} sx={{ mb: 2 }}>
+          <Box key={i} sx={{ mb: 2, p: 2.5, borderRadius: 5, bgcolor: 'background.default' }}>
             <Skeleton variant="text" width="80%" height={32} />
             <Skeleton variant="text" width="60%" height={24} />
             <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
@@ -50,17 +50,17 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
             </Box>
           </Box>
         ))}
-      </Paper>
+      </Box>
     );
   }
 
   if (products.length === 0) {
     return (
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography variant="body1" color="text.secondary">
           No trending products found. Try adjusting your filters.
         </Typography>
-      </Paper>
+      </Box>
     );
   }
 
@@ -72,8 +72,7 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <List disablePadding>
+      <List disablePadding sx={{ p: 1.5 }}>
         {products.map((product, index) => {
           const config = sourceConfig[product.source];
           const SourceIcon = config?.icon || TrendingUpIcon;
@@ -84,62 +83,68 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
               sx={{
                 flexDirection: 'column',
                 alignItems: 'flex-start',
-                borderBottom: index < products.length - 1 ? '1px solid' : 'none',
-                borderColor: 'divider',
+                border: '1px solid',
+                borderColor: index < products.length - 1 ? 'divider' : 'rgba(28, 27, 31, 0.12)',
+                borderRadius: 3,
                 py: 2.5,
-                px: 0,
-                '&:hover': {
-                  backgroundColor: 'action.hover',
-                },
+                px: 2.5,
+                mb: 1.5,
+                bgcolor: '#fffbff',
               }}
             >
-              {/* Header Row - Title with Link */}
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', mb: 1 }}>
-                <Box sx={{ flexGrow: 1 }}>
-                  <MuiLink
-                    href={product.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    underline="hover"
-                    sx={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      fontSize: '1.1rem',
-                      fontWeight: 600,
-                      color: 'primary.main',
-                      '&:hover': {
-                        color: 'primary.dark',
-                      },
-                    }}
-                  >
-                    {product.title}
-                    <OpenInNewIcon sx={{ fontSize: 16, opacity: 0.7 }} />
-                  </MuiLink>
-                  
-                  {/* Author */}
-                  {product.author && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                      by {product.author}
-                    </Typography>
-                  )}
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+                <Box
+                  sx={{
+                    minWidth: { xs: 'auto', md: 72 },
+                    color: 'text.secondary',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  #{index + 1}
                 </Box>
 
-                {/* Source Badge */}
-                <Chip
-                  icon={<SourceIcon />}
-                  label={config?.label || product.source_display}
-                  size="small"
-                  variant="outlined"
-                  sx={{
-                    borderColor: config?.color,
-                    color: config?.color,
-                    '& .MuiChip-icon': { color: config?.color },
-                  }}
-                />
-              </Box>
+                <Box sx={{ width: '100%' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', mb: 1, gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <MuiLink
+                        href={product.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        underline="hover"
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          fontSize: '1.08rem',
+                          fontWeight: 600,
+                          color: 'text.primary',
+                        }}
+                      >
+                        {product.title}
+                        <OpenInNewIcon sx={{ fontSize: 16, opacity: 0.7 }} />
+                      </MuiLink>
 
-              {/* Description/Content */}
+                      {product.author && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                          by {product.author}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Chip
+                      icon={<SourceIcon />}
+                      label={config?.label || product.source_display}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        borderColor: config?.color,
+                        color: config?.color,
+                        '& .MuiChip-icon': { color: config?.color },
+                      }}
+                    />
+                  </Box>
+
               {product.content && (
                 <Typography
                   variant="body2"
@@ -157,8 +162,7 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
                 </Typography>
               )}
 
-              {/* Metrics Row */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.25 }}>
                 <Chip
                   icon={<ThumbUpIcon />}
                   label={`${product.engagement_score.toLocaleString()} pts`}
@@ -186,7 +190,6 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
                 />
               </Box>
 
-              {/* Tags/Topics Row */}
               {product.topic_names && product.topic_names.length > 0 && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {product.topic_names.slice(0, 8).map((tag) => (
@@ -220,11 +223,12 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
                   )}
                 </Box>
               )}
+                </Box>
+              </Stack>
             </ListItem>
           );
         })}
       </List>
-    </Paper>
   );
 };
 

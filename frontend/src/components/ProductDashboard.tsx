@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-  Box,
-  Typography,
-  Button,
   Alert,
+  Box,
+  Button,
   CircularProgress,
   Paper,
+  Stack,
   ToggleButtonGroup,
   ToggleButton,
-  TextField,
   IconButton,
+  Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -19,14 +19,12 @@ import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { fetchTopPosts, fetchStats, refreshData } from '../services/api';
-import { useFilterStore } from '../store/filterStore';
 import ProductList from './ProductList';
 import StatsPanel from './StatsPanel';
 import { format, subDays, addDays, parseISO } from 'date-fns';
 
 const ProductDashboard = () => {
   const queryClient = useQueryClient();
-  const { source, days } = useFilterStore();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'engagement' | 'recency'>('engagement');
   
@@ -112,43 +110,67 @@ const ProductDashboard = () => {
   });
 
   return (
-    <Box>
-      {/* Header */}
-      <Box
+    <Stack spacing={3}>
+      <Paper
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          mb: 3,
+          p: { xs: 3, md: 4 },
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <RocketLaunchIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-          <Typography variant="h3" component="h1" fontWeight="bold">
-            Trendify
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={refreshing ? <CircularProgress size={20} /> : <RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={refreshing}
+        <Box sx={{ position: 'absolute', inset: 0, borderTop: '4px solid', borderColor: 'secondary.main', pointerEvents: 'none' }} />
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          justifyContent="space-between"
         >
-          {refreshing ? 'Refreshing...' : 'Refresh Data'}
-        </Button>
-      </Box>
-
-      {/* Subtitle */}
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
-        Browse day-by-day trending products from Product Hunt, Hacker News, Dev.to, GitHub, Lobsters, and TAAFT
-      </Typography>
-
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Source Filter */}
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            <Typography variant="overline" color="text.secondary">
+              Product discovery
+            </Typography>
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.75 }}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2,
+                  display: 'grid',
+                  placeItems: 'center',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                }}
+              >
+                <RocketLaunchIcon />
+              </Box>
+              <Typography variant="h3" component="h1">
+                Product dashboard
+              </Typography>
+            </Stack>
+            <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 760 }}>
+              Browse launches and trending projects by source, day, and sort mode with a tighter material documentation layout.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+              {format(parseISO(selectedDate), 'MMMM d, yyyy')} · {sortedProducts.length} items · {sortBy === 'engagement' ? 'sorted by engagement' : 'sorted by recency'}{localSource !== 'all' ? ` · ${localSource}` : ''}
+            </Typography>
+          </Box>
+
+          <Button
+            variant="contained"
+            startIcon={refreshing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing' : 'Refresh data'}
+          </Button>
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, minmax(0, 1fr))' } }}>
+          {/* Source Filter */}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
               Source
             </Typography>
             <ToggleButtonGroup
@@ -158,6 +180,7 @@ const ProductDashboard = () => {
                 if (newSource !== null) setLocalSource(newSource);
               }}
               size="small"
+              sx={{ mt: 0, flexWrap: 'wrap' }}
             >
               <ToggleButton value="all">All</ToggleButton>
               <ToggleButton value="PRODUCT_HUNT">Product Hunt</ToggleButton>
@@ -170,17 +193,23 @@ const ProductDashboard = () => {
           </Box>
 
           {/* Date Navigation */}
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
               Date
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0, 
-                border: '1px solid', 
-                borderColor: 'divider', 
-                borderRadius: 1, 
-                overflow: 'hidden'
-              }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0, flexWrap: 'wrap' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 2.5,
+                  overflow: 'hidden',
+                  bgcolor: 'background.paper',
+                }}
+              >
                 <IconButton 
                   size="small" 
                   onClick={goToPreviousDay}
@@ -197,7 +226,7 @@ const ProductDashboard = () => {
                 <Typography 
                   variant="body2" 
                   sx={{ 
-                    minWidth: 160, 
+                    minWidth: 156, 
                     textAlign: 'center',
                     fontWeight: 500,
                     userSelect: 'none',
@@ -224,7 +253,7 @@ const ProductDashboard = () => {
               </Box>
               <Button
                 size="small"
-                variant="outlined"
+                variant="text"
                 onClick={() => setSelectedDate('2026-03-09')}
                 disabled={selectedDate === '2026-03-09'}
                 sx={{ minWidth: 'auto', px: 1.5 }}
@@ -235,8 +264,8 @@ const ProductDashboard = () => {
           </Box>
 
           {/* Sort By */}
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
               Sort By
             </Typography>
             <ToggleButtonGroup
@@ -246,6 +275,7 @@ const ProductDashboard = () => {
                 if (newSort) setSortBy(newSort);
               }}
               size="small"
+              sx={{ mt: 0, flexWrap: 'wrap' }}
             >
               <ToggleButton value="engagement">
                 <TrendingUpIcon sx={{ fontSize: 16, mr: 0.5 }} />
@@ -260,47 +290,27 @@ const ProductDashboard = () => {
         </Box>
       </Paper>
 
-      {/* Error Alerts */}
       {productsError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error">
           Failed to load products: {(productsError as Error).message}
         </Alert>
       )}
       {statsError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error">
           Failed to load statistics: {(statsError as Error).message}
         </Alert>
       )}
 
-      {/* Main Content Grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3 }}>
-        {/* Stats Panel - Left Side */}
-        <Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '320px minmax(0, 1fr)' }, gap: 3, alignItems: 'start' }}>
+        <Box sx={{ position: { xl: 'sticky' }, top: { xl: 104 } }}>
           <StatsPanel stats={stats} isLoading={statsLoading} />
-          
-          {/* Info Card */}
-          <Paper sx={{ p: 2, mt: 2 }}>
-            <Typography variant="h6" gutterBottom fontWeight="bold">
-              About
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Trendify tracks trending products and projects from across the web.
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Products are ranked by engagement score, which combines upvotes, comments, and social signals.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Tags shown are native to each platform (Product Hunt tags, GitHub topics, subreddit tags).
-            </Typography>
-          </Paper>
         </Box>
 
-        {/* Products List - Right Side */}
-        <Box>
-          <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Paper sx={{ overflow: 'hidden' }}>
+          <Box sx={{ px: { xs: 2.5, md: 3.5 }, py: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
               <Box>
-                <Typography variant="h5" gutterBottom fontWeight="bold">
+                <Typography variant="h5" gutterBottom>
                   Products from {format(parseISO(selectedDate), 'MMMM d, yyyy')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -313,11 +323,11 @@ const ProductDashboard = () => {
                 {sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}
               </Typography>
             </Box>
-            <ProductList products={sortedProducts} isLoading={productsLoading} />
-          </Paper>
-        </Box>
+          </Box>
+          <ProductList products={sortedProducts} isLoading={productsLoading} />
+        </Paper>
       </Box>
-    </Box>
+    </Stack>
   );
 };
 
