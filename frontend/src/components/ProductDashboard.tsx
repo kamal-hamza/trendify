@@ -147,9 +147,6 @@ const ProductDashboard = () => {
                 Product dashboard
               </Typography>
             </Stack>
-            <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 760 }}>
-              Browse launches and trending projects by source, day, and sort mode with a tighter material documentation layout.
-            </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
               {format(parseISO(selectedDate), 'MMMM d, yyyy')} · {sortedProducts.length} items · {sortBy === 'engagement' ? 'sorted by engagement' : 'sorted by recency'}{localSource !== 'all' ? ` · ${localSource}` : ''}
             </Typography>

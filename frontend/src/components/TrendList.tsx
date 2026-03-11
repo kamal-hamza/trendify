@@ -124,7 +124,6 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
                       />
                     )}
                   </Typography>
-                  <Chip label={trend.category_display} size="small" variant="outlined" />
                 </Box>
 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
