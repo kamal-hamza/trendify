@@ -7,10 +7,9 @@ import {
   CircularProgress,
   Paper,
   Stack,
-  ToggleButtonGroup,
-  ToggleButton,
   IconButton,
   Typography,
+  Chip,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -27,28 +26,28 @@ const ProductDashboard = () => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'engagement' | 'recency'>('engagement');
-  
+
   // Use specific date instead of days range (default to March 9, 2026 - the latest date with data)
   const [selectedDate, setSelectedDate] = useState('2026-03-09');
   const [localSource, setLocalSource] = useState('all');
 
   // Build query params - fetch posts from selected date only
   const buildParams = () => {
-    const params: any = { 
+    const params: any = {
       limit: 100,
       date: selectedDate,
     };
     if (localSource !== 'all') params.source = localSource;
     return params;
   };
-  
+
   // Date navigation helpers
   const goToPreviousDay = () => {
     const currentDate = parseISO(selectedDate);
     const prevDay = subDays(currentDate, 1);
     setSelectedDate(format(prevDay, 'yyyy-MM-dd'));
   };
-  
+
   const goToNextDay = () => {
     const currentDate = parseISO(selectedDate);
     const nextDay = addDays(currentDate, 1);
@@ -113,12 +112,11 @@ const ProductDashboard = () => {
     <Stack spacing={3}>
       <Paper
         sx={{
-          p: { xs: 3, md: 4 },
+          p: 3,
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        <Box sx={{ position: 'absolute', inset: 0, borderTop: '4px solid', borderColor: 'secondary.main', pointerEvents: 'none' }} />
         <Stack
           direction={{ xs: 'column', md: 'row' }}
           spacing={2}
@@ -163,35 +161,48 @@ const ProductDashboard = () => {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+      <Paper sx={{ p: 3 }}>
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, minmax(0, 1fr))' } }}>
           {/* Source Filter */}
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
               Source
             </Typography>
-            <ToggleButtonGroup
-              value={localSource}
-              exclusive
-              onChange={(_, newSource) => {
-                if (newSource !== null) setLocalSource(newSource);
-              }}
-              size="small"
-              sx={{ mt: 0, flexWrap: 'wrap' }}
-            >
-              <ToggleButton value="all">All</ToggleButton>
-              <ToggleButton value="PRODUCT_HUNT">Product Hunt</ToggleButton>
-              <ToggleButton value="HN">Hacker News</ToggleButton>
-              <ToggleButton value="DEVTO">Dev.to</ToggleButton>
-              <ToggleButton value="GITHUB_TRENDING">GitHub</ToggleButton>
-              <ToggleButton value="LOBSTERS">Lobsters</ToggleButton>
-              <ToggleButton value="TAAFT">AI Tools</ToggleButton>
-            </ToggleButtonGroup>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'PRODUCT_HUNT', label: 'Product Hunt' },
+                { value: 'HN', label: 'Hacker News' },
+                { value: 'DEVTO', label: 'Dev.to' },
+                { value: 'GITHUB_TRENDING', label: 'GitHub' },
+                { value: 'LOBSTERS', label: 'Lobsters' },
+                { value: 'TAAFT', label: 'AI Tools' },
+              ].map(s => (
+                <Chip
+                  key={s.value}
+                  label={s.label}
+                  onClick={() => setLocalSource(s.value)}
+                  clickable
+                  sx={{
+                    borderRadius: 1.5,
+                    bgcolor: localSource === s.value ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                    color: localSource === s.value ? 'secondary.main' : 'text.secondary',
+                    border: '1px solid',
+                    borderColor: localSource === s.value ? 'rgba(99, 102, 241, 0.3)' : 'divider',
+                    fontWeight: localSource === s.value ? 600 : 500,
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      bgcolor: localSource === s.value ? 'rgba(99, 102, 241, 0.15)' : 'action.hover',
+                    }
+                  }}
+                />
+              ))}
+            </Box>
           </Box>
 
           {/* Date Navigation */}
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
               Date
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0, flexWrap: 'wrap' }}>
@@ -207,11 +218,11 @@ const ProductDashboard = () => {
                   bgcolor: 'background.paper',
                 }}
               >
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   onClick={goToPreviousDay}
                   title="Previous day"
-                  sx={{ 
+                  sx={{
                     borderRadius: 0,
                     borderRight: '1px solid',
                     borderColor: 'divider',
@@ -220,10 +231,10 @@ const ProductDashboard = () => {
                 >
                   <NavigateBeforeIcon fontSize="small" />
                 </IconButton>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    minWidth: 156, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    minWidth: 156,
                     textAlign: 'center',
                     fontWeight: 500,
                     userSelect: 'none',
@@ -233,12 +244,12 @@ const ProductDashboard = () => {
                 >
                   {format(parseISO(selectedDate), 'MMMM d, yyyy')}
                 </Typography>
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   onClick={goToNextDay}
                   disabled={selectedDate >= '2026-03-09'}
                   title="Next day"
-                  sx={{ 
+                  sx={{
                     borderRadius: 0,
                     borderLeft: '1px solid',
                     borderColor: 'divider',
@@ -262,27 +273,47 @@ const ProductDashboard = () => {
 
           {/* Sort By */}
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
               Sort By
             </Typography>
-            <ToggleButtonGroup
-              value={sortBy}
-              exclusive
-              onChange={(_, newSort) => {
-                if (newSort) setSortBy(newSort);
-              }}
-              size="small"
-              sx={{ mt: 0, flexWrap: 'wrap' }}
-            >
-              <ToggleButton value="engagement">
-                <TrendingUpIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                Trending
-              </ToggleButton>
-              <ToggleButton value="recency">
-                <NewReleasesIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                Latest
-              </ToggleButton>
-            </ToggleButtonGroup>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              <Chip
+                icon={<TrendingUpIcon sx={{ fontSize: '16px !important' }} />}
+                label="Trending"
+                onClick={() => setSortBy('engagement')}
+                clickable
+                sx={{
+                  borderRadius: 1.5,
+                  bgcolor: sortBy === 'engagement' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: sortBy === 'engagement' ? 'secondary.main' : 'text.secondary',
+                  border: '1px solid',
+                  borderColor: sortBy === 'engagement' ? 'rgba(99, 102, 241, 0.3)' : 'divider',
+                  fontWeight: sortBy === 'engagement' ? 600 : 500,
+                  '& .MuiChip-icon': {
+                    color: sortBy === 'engagement' ? 'secondary.main' : 'text.secondary',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
+              <Chip
+                icon={<NewReleasesIcon sx={{ fontSize: '16px !important' }} />}
+                label="Latest"
+                onClick={() => setSortBy('recency')}
+                clickable
+                sx={{
+                  borderRadius: 1.5,
+                  bgcolor: sortBy === 'recency' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: sortBy === 'recency' ? 'secondary.main' : 'text.secondary',
+                  border: '1px solid',
+                  borderColor: sortBy === 'recency' ? 'rgba(99, 102, 241, 0.3)' : 'divider',
+                  fontWeight: sortBy === 'recency' ? 600 : 500,
+                  '& .MuiChip-icon': {
+                    color: sortBy === 'recency' ? 'secondary.main' : 'text.secondary',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
+            </Box>
           </Box>
         </Box>
       </Paper>
@@ -304,14 +335,14 @@ const ProductDashboard = () => {
         </Box>
 
         <Paper sx={{ overflow: 'hidden' }}>
-          <Box sx={{ px: { xs: 2.5, md: 3.5 }, py: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
               <Box>
                 <Typography variant="h5" gutterBottom>
                   Products from {format(parseISO(selectedDate), 'MMMM d, yyyy')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {sortBy === 'engagement' 
+                  {sortBy === 'engagement'
                     ? 'Sorted by engagement score (upvotes + comments)'
                     : 'Sorted by publish date (newest first)'}
                 </Typography>

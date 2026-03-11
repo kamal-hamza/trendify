@@ -50,7 +50,7 @@ const AppShell = ({ children }: AppShellProps) => {
           height: '100vh',
           px: 2.5,
           py: 3,
-          bgcolor: '#f8f2ff',
+          bgcolor: '#F8FAFC',
           borderRight: '1px solid',
           borderColor: 'divider',
         }}
@@ -92,13 +92,16 @@ const AppShell = ({ children }: AppShellProps) => {
                   width: '100%',
                   justifyContent: 'flex-start',
                   textAlign: 'left',
-                  borderRadius: 3,
+                  borderRadius: 2,
                   px: 1.5,
                   py: 1.25,
-                  bgcolor: active ? '#e8def8' : 'transparent',
-                  color: active ? '#21005d' : 'text.primary',
-                  border: '1px solid',
-                  borderColor: active ? '#b69df8' : 'transparent',
+                  bgcolor: active ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: active ? 'primary.main' : 'text.primary',
+                  borderLeft: active ? '3px solid #0F172A' : '3px solid transparent',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    bgcolor: active ? 'rgba(99, 102, 241, 0.15)' : 'rgba(0,0,0,0.04)',
+                  }
                 }}
               >
                 <Stack direction="row" spacing={1.25} alignItems="flex-start">
@@ -109,8 +112,8 @@ const AppShell = ({ children }: AppShellProps) => {
                       borderRadius: 2,
                       display: 'grid',
                       placeItems: 'center',
-                      bgcolor: active ? 'primary.main' : '#ede7f6',
-                      color: active ? 'primary.contrastText' : 'primary.main',
+                      bgcolor: active ? 'primary.main' : 'transparent',
+                      color: active ? 'primary.contrastText' : 'text.secondary',
                       flexShrink: 0,
                     }}
                   >
@@ -138,7 +141,7 @@ const AppShell = ({ children }: AppShellProps) => {
             top: 0,
             zIndex: 1200,
             backdropFilter: 'blur(16px)',
-            bgcolor: 'rgba(243, 237, 247, 0.88)',
+            bgcolor: 'rgba(248, 250, 252, 0.88)',
             borderBottom: '1px solid',
             borderColor: 'divider',
             px: { xs: 2, md: 4 },
@@ -176,11 +179,11 @@ const AppShell = ({ children }: AppShellProps) => {
         <Box
           component="main"
           sx={{
-          px: { xs: 2, md: 4 },
-          py: { xs: 2, md: 4 },
-          maxWidth: 1320,
-        }}
-      >
+            px: { xs: 2, md: 4 },
+            py: { xs: 2, md: 4 },
+            maxWidth: 1320,
+          }}
+        >
           <Stack direction="row" spacing={1} sx={{ display: { xs: 'flex', md: 'none' }, mb: 2 }}>
             {navigationItems.map((item) => {
               const active = location.pathname === item.path;
@@ -193,11 +196,11 @@ const AppShell = ({ children }: AppShellProps) => {
                     flex: 1,
                     px: 2,
                     py: 1.25,
-                    borderRadius: 2.5,
-                    bgcolor: active ? '#e8def8' : 'background.paper',
-                    color: active ? '#21005d' : 'text.primary',
+                    borderRadius: 2,
+                    bgcolor: active ? 'rgba(99, 102, 241, 0.1)' : 'background.paper',
+                    color: active ? 'primary.main' : 'text.primary',
                     border: '1px solid',
-                    borderColor: active ? '#b69df8' : 'divider',
+                    borderColor: active ? 'primary.main' : 'divider',
                     fontWeight: 600,
                   }}
                 >

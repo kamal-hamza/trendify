@@ -1,4 +1,4 @@
-import { Box, FormControl, Select, MenuItem, Paper, ToggleButton, ToggleButtonGroup, Chip, Typography } from '@mui/material';
+import { Box, FormControl, Select, MenuItem, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -97,11 +97,12 @@ const FilterBar = () => {
             <ToggleButton value="emerging" aria-label="emerging">
               <RocketLaunchIcon sx={{ mr: 0.75, fontSize: 18 }} />
               Emerging
-              <Chip
-                label="New"
-                size="small"
-                sx={{ ml: 0.75, height: 20, bgcolor: '#d6f8d3', color: '#146c2e' }}
-              />
+              <Box
+                component="span"
+                sx={{ ml: 1, px: 0.75, py: 0.25, borderRadius: 1, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}
+              >
+                NEW
+              </Box>
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>

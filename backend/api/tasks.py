@@ -562,8 +562,8 @@ def fetch_all_platforms(
                     published_at=post_data["published_at"],
                 )
 
-                # Sentiment analysis disabled - focusing on native tags only
-                # calculate_sentiment_score.delay(post.id)
+                # Enable sentiment analysis
+                calculate_sentiment_score.delay(post.id)
 
                 saved_count += 1
 

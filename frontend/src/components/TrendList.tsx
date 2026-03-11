@@ -11,9 +11,11 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import RedditIcon from '@mui/icons-material/Reddit';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
+import { Sparkles, Heart, Rocket, TrendingUp as TrendingUpLucide, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import MentionBadge from './MentionBadge';
 import type { TrendingTopic, EmergingTopic } from '../services/api';
 
 interface TrendListProps {
@@ -83,123 +85,134 @@ const TrendList = ({ trends, isLoading }: TrendListProps) => {
   };
 
   return (
-      <List disablePadding sx={{ p: 1.5 }}>
-        {trends.map((trend, index) => (
-          <ListItem
-            key={trend.id}
-            sx={{
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              border: '1px solid',
-              borderColor: index < trends.length - 1 ? 'divider' : 'rgba(28, 27, 31, 0.12)',
-              borderRadius: 3,
-              py: 2.5,
-              px: 2.5,
-              mb: 1.5,
-              bgcolor: '#fffbff',
-            }}
-          >
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
-              <Box
-                sx={{
-                  minWidth: { xs: 'auto', md: 72 },
-                  color: 'text.secondary',
-                  fontWeight: 700,
-                  fontSize: '0.95rem',
-                }}
-              >
-                #{index + 1}
-              </Box>
+    <List disablePadding sx={{ p: 1.5 }}>
+      {trends.map((trend, index) => (
+        <ListItem
+          key={trend.id}
+          sx={{
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            border: '1px solid',
+            borderColor: 'transparent',
+            borderRadius: 3,
+            py: 3,
+            px: 3,
+            mb: 2,
+            bgcolor: '#FFFFFF',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            }
+          }}
+        >
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+            <Box
+              sx={{
+                minWidth: { xs: 'auto', md: 72 },
+                color: 'text.secondary',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+              }}
+            >
+              #{index + 1}
+            </Box>
 
-              <Box sx={{ width: '100%' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1, gap: 1, flexWrap: 'wrap' }}>
-                  <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {trend.name}
-                    {isEmergingTopic(trend) && trend.is_new && (
-                      <Chip
-                        icon={<NewReleasesIcon />}
-                        label="NEW"
-                        size="small"
-                        sx={{ height: 22, fontSize: '0.72rem', fontWeight: 700, bgcolor: '#d6f8d3', color: '#146c2e' }}
-                      />
-                    )}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-                  {isEmergingTopic(trend) ? (
-                    <>
-                      <Chip
-                        icon={<RocketLaunchIcon />}
-                        label={`Growth ${(trend.avg_growth_rate * 100).toFixed(0)}%`}
-                        size="small"
-                        sx={{
-                          backgroundColor: getGrowthColor(trend.avg_growth_rate),
-                          color: 'white',
-                          '& .MuiChip-icon': { color: 'white' },
-                        }}
-                      />
-                      <Chip label={`${trend.age_days} days old`} size="small" variant="outlined" />
-                    </>
-                  ) : (
+            <Box sx={{ width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: 1, gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="h6" component="div" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {trend.name}
+                  {isEmergingTopic(trend) && trend.is_new && (
                     <Chip
-                      icon={<TrendingUpIcon />}
-                      label={`Momentum ${trend.momentum_score.toFixed(1)}`}
+                      icon={<NewReleasesIcon />}
+                      label="NEW"
                       size="small"
-                      sx={{
-                        backgroundColor: getMomentumColor(trend.momentum_score),
-                        color: 'white',
-                        '& .MuiChip-icon': { color: 'white' },
-                      }}
+                      sx={{ height: 22, fontSize: '0.72rem', fontWeight: 700, bgcolor: '#d6f8d3', color: '#146c2e' }}
                     />
                   )}
-                  <Chip label={`${trend.total_mentions} mentions`} size="small" variant="outlined" />
-                  <Chip label={`${trend.total_engagement.toLocaleString()} engagement`} size="small" variant="outlined" />
-                  <Chip
-                    label={`Sentiment ${trend.avg_sentiment.toFixed(2)}`}
-                    size="small"
-                    sx={{
-                      borderColor: getSentimentColor(trend.avg_sentiment),
-                      color: getSentimentColor(trend.avg_sentiment),
-                    }}
-                    variant="outlined"
-                  />
-                </Box>
-
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {Object.entries(trend.sources).map(([source, count]) => {
-                    const config = sourceConfig[source];
-                    if (!config) return null;
-
-                    const SourceIcon = config.icon;
-                    return (
-                      <Tooltip key={source} title={`${config.label}: ${count} posts`}>
-                        <Chip
-                          icon={<SourceIcon />}
-                          label={`${config.label} · ${count}`}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 24, fontSize: '0.74rem' }}
-                        />
-                      </Tooltip>
-                    );
-                  })}
-                </Box>
-
-            {isEmergingTopic(trend) && trend.first_seen ? (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    First seen {formatDistanceToNow(new Date(trend.first_seen), { addSuffix: true })}
-                  </Typography>
-            ) : trend.peak_date ? (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Peak {formatDistanceToNow(new Date(trend.peak_date), { addSuffix: true })}
-                  </Typography>
-            ) : null}
+                </Typography>
               </Box>
-            </Stack>
-          </ListItem>
-        ))}
-      </List>
+
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5, mb: 1.5, alignItems: 'center' }}>
+                {isEmergingTopic(trend) ? (
+                  <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getGrowthColor(trend.avg_growth_rate) }}>
+                      <Rocket size={16} strokeWidth={2.5} />
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                        +{(trend.avg_growth_rate * 100).toFixed(0)}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary', opacity: 0.75 }}>
+                      <Clock size={14} strokeWidth={2} />
+                      <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                        {trend.age_days}d
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getMomentumColor(trend.momentum_score) }}>
+                    <TrendingUpLucide size={16} strokeWidth={2.5} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                      {trend.momentum_score.toFixed(1)}
+                    </Typography>
+                  </Box>
+                )}
+
+                <MentionBadge
+                  count={trend.total_mentions}
+                  isHot={isEmergingTopic(trend) ? trend.avg_growth_rate > 1 : trend.momentum_score > 3}
+                />
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary', opacity: 0.85 }}>
+                  <Heart size={16} strokeWidth={2} />
+                  <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                    {trend.total_engagement.toLocaleString()}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getSentimentColor(trend.avg_sentiment) }}>
+                  <Sparkles size={16} strokeWidth={2.5} />
+                  <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                    {trend.avg_sentiment > 0 ? '+' : ''}{trend.avg_sentiment.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {Object.entries(trend.sources).map(([source, count]) => {
+                  const config = sourceConfig[source];
+                  if (!config) return null;
+
+                  const SourceIcon = config.icon;
+                  return (
+                    <Tooltip key={source} title={`${config.label}: ${count} posts`}>
+                      <Chip
+                        icon={<SourceIcon />}
+                        label={`${config.label} · ${count}`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 24, fontSize: '0.74rem' }}
+                      />
+                    </Tooltip>
+                  );
+                })}
+              </Box>
+
+              {isEmergingTopic(trend) && trend.first_seen ? (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  First seen {formatDistanceToNow(new Date(trend.first_seen), { addSuffix: true })}
+                </Typography>
+              ) : trend.peak_date ? (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  Peak {formatDistanceToNow(new Date(trend.peak_date), { addSuffix: true })}
+                </Typography>
+              ) : null}
+            </Box>
+          </Stack>
+        </ListItem>
+      ))}
+    </List>
   );
 };
 

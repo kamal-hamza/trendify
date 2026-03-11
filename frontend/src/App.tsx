@@ -21,36 +21,37 @@ let theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#4f378b',
+      main: '#0F172A',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#00639b',
+      main: '#6366F1',
+      contrastText: '#ffffff',
     },
     success: {
-      main: '#146c2e',
+      main: '#10B981',
     },
     warning: {
-      main: '#b26a00',
+      main: '#F59E0B',
     },
     error: {
-      main: '#b3261e',
+      main: '#EF4444',
     },
     text: {
-      primary: '#1c1b1f',
-      secondary: '#49454f',
+      primary: '#0F172A',
+      secondary: '#475569',
     },
     background: {
-      default: '#f3edf7',
-      paper: '#fffbff',
+      default: '#F8FAFC',
+      paper: '#FFFFFF',
     },
-    divider: 'rgba(28, 27, 31, 0.14)',
+    divider: 'rgba(0, 0, 0, 0.08)',
   },
   shape: {
-    borderRadius: 16,
+    borderRadius: 12,
   },
   typography: {
-    fontFamily: '"Roboto Flex", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
       fontSize: '3rem',
       fontWeight: 700,
@@ -68,11 +69,11 @@ let theme = createTheme({
     },
     h4: {
       fontSize: '1.5rem',
-      fontWeight: 700,
+      fontWeight: 600,
     },
     h5: {
       fontSize: '1.2rem',
-      fontWeight: 700,
+      fontWeight: 600,
     },
     subtitle1: {
       fontSize: '1rem',
@@ -87,16 +88,16 @@ let theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          background: 'linear-gradient(180deg, #f8f2ff 0%, #f3edf7 100%)',
+          backgroundColor: '#F8FAFC',
         },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 18,
+          borderRadius: 12,
           boxShadow: 'none',
-          border: '1px solid rgba(28, 27, 31, 0.1)',
+          border: '1px solid rgba(0,0,0,0.08)',
         },
       },
     },
@@ -104,8 +105,8 @@ let theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          borderRadius: 18,
-          border: '1px solid rgba(28, 27, 31, 0.1)',
+          borderRadius: 12,
+          border: '1px solid rgba(0,0,0,0.08)',
           boxShadow: 'none',
         },
       },
@@ -113,9 +114,9 @@ let theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: 8,
           paddingInline: 18,
-          minHeight: 42,
+          minHeight: 40,
           boxShadow: 'none',
         },
       },
@@ -123,7 +124,7 @@ let theme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          borderRadius: 6,
           fontWeight: 500,
         },
       },
@@ -131,8 +132,8 @@ let theme = createTheme({
     MuiToggleButtonGroup: {
       styleOverrides: {
         grouped: {
-          borderRadius: '10px !important',
-          border: '1px solid rgba(28, 27, 31, 0.12) !important',
+          borderRadius: '8px !important',
+          border: '1px solid rgba(0,0,0,0.08) !important',
           margin: 0,
         },
       },
@@ -140,13 +141,14 @@ let theme = createTheme({
     MuiToggleButton: {
       styleOverrides: {
         root: {
-          borderRadius: '10px !important',
+          borderRadius: '8px !important',
           paddingInline: 14,
           textTransform: 'none',
-          backgroundColor: '#fffbff',
+          backgroundColor: '#FFFFFF',
+          color: '#475569',
           '&.Mui-selected': {
-            backgroundColor: '#e8def8',
-            color: '#21005d',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            color: '#6366F1',
           },
         },
       },
@@ -154,15 +156,15 @@ let theme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          backgroundColor: '#ffffff',
+          borderRadius: 8,
+          backgroundColor: '#FFFFFF',
         },
       },
     },
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 18,
+          borderRadius: 8,
         },
       },
     },
@@ -178,11 +180,11 @@ function App() {
         <CssBaseline />
         <Router>
           <AppShell>
-              <Routes>
-                <Route path="/" element={<ProductDashboard />} />
-                <Route path="/topics" element={<TrendDashboard />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+            <Routes>
+              <Route path="/" element={<ProductDashboard />} />
+              <Route path="/topics" element={<TrendDashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </AppShell>
         </Router>
       </ThemeProvider>

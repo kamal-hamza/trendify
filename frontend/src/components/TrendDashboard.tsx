@@ -76,12 +76,11 @@ const TrendDashboard = () => {
     <Stack spacing={3}>
       <Paper
         sx={{
-          p: { xs: 3, md: 4 },
+          p: 3,
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        <Box sx={{ position: 'absolute', inset: 0, borderTop: '4px solid', borderColor: 'primary.main', pointerEvents: 'none' }} />
         <Stack
           direction={{ xs: 'column', md: 'row' }}
           spacing={2}
@@ -144,8 +143,7 @@ const TrendDashboard = () => {
       <Paper sx={{ overflow: 'hidden' }}>
         <Box
           sx={{
-            px: { xs: 2.5, md: 3.5 },
-            py: 3,
+            p: 3,
             borderBottom: '1px solid',
             borderColor: 'divider',
             display: 'flex',

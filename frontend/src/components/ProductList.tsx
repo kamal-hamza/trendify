@@ -3,7 +3,6 @@ import {
   ListItem,
   Typography,
   Box,
-  Chip,
   Link as MuiLink,
   Skeleton,
   Stack,
@@ -11,10 +10,11 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import RedditIcon from '@mui/icons-material/Reddit';
-import CommentIcon from '@mui/icons-material/Comment';
-import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { formatDistanceToNow } from 'date-fns';
+import { ArrowUp, MessageSquare, Clock } from 'lucide-react';
+import TopicTags from './TopicTags';
+import SourceIndicator from './SourceIndicator';
 import type { Post } from '../services/api';
 
 interface ProductListProps {
@@ -72,163 +72,127 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
   };
 
   return (
-      <List disablePadding sx={{ p: 1.5 }}>
-        {products.map((product, index) => {
-          const config = sourceConfig[product.source];
-          const SourceIcon = config?.icon || TrendingUpIcon;
+    <List disablePadding sx={{ p: 1.5 }}>
+      {products.map((product, index) => {
+        const config = sourceConfig[product.source];
 
-          return (
-            <ListItem
-              key={product.id}
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                border: '1px solid',
-                borderColor: index < products.length - 1 ? 'divider' : 'rgba(28, 27, 31, 0.12)',
-                borderRadius: 3,
-                py: 2.5,
-                px: 2.5,
-                mb: 1.5,
-                bgcolor: '#fffbff',
-              }}
-            >
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
-                <Box
-                  sx={{
-                    minWidth: { xs: 'auto', md: 72 },
-                    color: 'text.secondary',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                  }}
-                >
-                  #{index + 1}
-                </Box>
-
-                <Box sx={{ width: '100%' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', mb: 1, gap: 1, flexWrap: 'wrap' }}>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <MuiLink
-                        href={product.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        underline="hover"
-                        sx={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          fontSize: '1.08rem',
-                          fontWeight: 600,
-                          color: 'text.primary',
-                        }}
-                      >
-                        {product.title}
-                        <OpenInNewIcon sx={{ fontSize: 16, opacity: 0.7 }} />
-                      </MuiLink>
-
-                      {product.author && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                          by {product.author}
-                        </Typography>
-                      )}
-                    </Box>
-
-                    <Chip
-                      icon={<SourceIcon />}
-                      label={config?.label || product.source_display}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        borderColor: config?.color,
-                        color: config?.color,
-                        '& .MuiChip-icon': { color: config?.color },
-                      }}
-                    />
-                  </Box>
-
-              {product.content && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{
-                    mb: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                  }}
-                >
-                  {product.content}
-                </Typography>
-              )}
-
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.25 }}>
-                <Chip
-                  icon={<ThumbUpIcon />}
-                  label={`${product.engagement_score.toLocaleString()} pts`}
-                  size="small"
-                  sx={{
-                    backgroundColor: getEngagementColor(product.engagement_score),
-                    color: 'white',
-                    fontWeight: 600,
-                    '& .MuiChip-icon': { color: 'white' },
-                  }}
-                />
-                
-                <Chip
-                  icon={<CommentIcon />}
-                  label={`${product.comment_count} comments`}
-                  size="small"
-                  variant="outlined"
-                />
-
-                <Chip
-                  label={formatDistanceToNow(new Date(product.published_at), { addSuffix: true })}
-                  size="small"
-                  variant="outlined"
-                  color="default"
-                />
+        return (
+          <ListItem
+            key={product.id}
+            sx={{
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              border: '1px solid',
+              borderColor: 'transparent',
+              borderRadius: 3,
+              py: 3,
+              px: 3,
+              mb: 2,
+              bgcolor: '#FFFFFF',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+              }
+            }}
+          >
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: '100%' }}>
+              <Box
+                sx={{
+                  minWidth: { xs: 'auto', md: 72 },
+                  color: 'text.secondary',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                }}
+              >
+                #{index + 1}
               </Box>
 
-              {product.topic_names && product.topic_names.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {product.topic_names.slice(0, 8).map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={`#${tag}`}
-                      size="small"
-                      variant="outlined"
+              <Box sx={{ width: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', mb: 1, gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <MuiLink
+                      href={product.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      underline="hover"
                       sx={{
-                        height: 22,
-                        fontSize: '0.7rem',
-                        borderRadius: 1,
-                        backgroundColor: 'action.hover',
-                        '&:hover': {
-                          backgroundColor: 'action.selected',
-                        },
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        fontSize: '1.08rem',
+                        fontWeight: 600,
+                        color: 'text.primary',
                       }}
-                    />
-                  ))}
-                  {product.topic_names.length > 8 && (
-                    <Chip
-                      label={`+${product.topic_names.length - 8} more`}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        height: 22,
-                        fontSize: '0.7rem',
-                        borderRadius: 1,
-                      }}
-                    />
-                  )}
+                    >
+                      {product.title}
+                      <OpenInNewIcon sx={{ fontSize: 16, opacity: 0.7 }} />
+                    </MuiLink>
+
+                    {product.author && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                        by {product.author}
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <SourceIndicator
+                    source={product.source}
+                    sourceDisplay={product.source_display}
+                    config={config}
+                  />
                 </Box>
-              )}
+
+                {product.content && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mb: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {product.content}
+                  </Typography>
+                )}
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5, mb: 1.5, alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getEngagementColor(product.engagement_score) }}>
+                    <ArrowUp size={16} strokeWidth={2.5} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                      {product.engagement_score.toLocaleString()}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary', opacity: 0.85 }}>
+                    <MessageSquare size={16} strokeWidth={2} />
+                    <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                      {product.comment_count}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary', opacity: 0.75 }}>
+                    <Clock size={14} strokeWidth={2} />
+                    <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                      {formatDistanceToNow(new Date(product.published_at), { addSuffix: true })}
+                    </Typography>
+                  </Box>
                 </Box>
-              </Stack>
-            </ListItem>
-          );
-        })}
-      </List>
+
+                {product.topic_names && product.topic_names.length > 0 && (
+                  <TopicTags topics={product.topic_names} />
+                )}
+              </Box>
+            </Stack>
+          </ListItem>
+        );
+      })}
+    </List>
   );
 };
 
