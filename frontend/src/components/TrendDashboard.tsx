@@ -90,7 +90,7 @@ const TrendDashboard = () => {
         >
           <Box>
             <Typography variant="overline" color="text.secondary">
-              Topic intelligence
+              Topic overview
             </Typography>
             <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.75 }}>
               <Box
@@ -110,11 +110,8 @@ const TrendDashboard = () => {
                 {mode === 'emerging' ? 'Emerging topics' : 'Trending topics'}
               </Typography>
             </Stack>
-            <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1.5, maxWidth: 720 }}>
-              Monitor high-signal conversations from GitHub, Hacker News, and Reddit in a cleaner material-style dashboard.
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              {trends.length} results · {days} day window{source !== 'all' ? ` · ${source}` : ''}{category !== 'all' ? ` · ${category}` : ''}
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Tracks aggregate topic activity and momentum so category filters directly affect the ranked results below.
             </Typography>
           </Box>
 
@@ -129,6 +126,8 @@ const TrendDashboard = () => {
         </Stack>
       </Paper>
 
+      <StatsPanel stats={stats} isLoading={statsLoading} />
+
       <FilterBar />
 
       {trendsError && (
@@ -142,32 +141,32 @@ const TrendDashboard = () => {
         </Alert>
       )}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', xl: '320px minmax(0, 1fr)' },
-          gap: 3,
-          alignItems: 'start',
-        }}
-      >
-        <Box sx={{ position: { xl: 'sticky' }, top: { xl: 104 } }}>
-          <StatsPanel stats={stats} isLoading={statsLoading} />
-        </Box>
-
-        <Paper sx={{ overflow: 'hidden' }}>
-          <Box sx={{ px: { xs: 2.5, md: 3.5 }, py: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Paper sx={{ overflow: 'hidden' }}>
+        <Box
+          sx={{
+            px: { xs: 2.5, md: 3.5 },
+            py: 3,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Box>
             <Typography variant="h5">
               {mode === 'emerging' ? 'Emerging topic list' : 'Topic ranking'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-              {mode === 'emerging'
-                ? 'Topics are sorted by growth rate and age so new breakouts surface first.'
-                : 'Topics are ordered by momentum score to highlight rising discussion velocity.'}
+              {trends.length} results · {days} day window{source !== 'all' ? ` · ${source}` : ''}{category !== 'all' ? ` · ${category}` : ''}
             </Typography>
           </Box>
-          <TrendList trends={trends} isLoading={trendsLoading} />
-        </Paper>
-      </Box>
+
+        </Box>
+        <TrendList trends={trends} isLoading={trendsLoading} />
+      </Paper>
     </Stack>
   );
 };

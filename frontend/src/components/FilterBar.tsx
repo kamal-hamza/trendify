@@ -1,4 +1,4 @@
-import { Box, FormControl, InputLabel, Select, MenuItem, Paper, ToggleButton, ToggleButtonGroup, Chip, Typography } from '@mui/material';
+import { Box, FormControl, Select, MenuItem, Paper, ToggleButton, ToggleButtonGroup, Chip, Typography } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -111,12 +111,9 @@ const FilterBar = () => {
             Source
           </Typography>
           <FormControl size="small" fullWidth>
-            <InputLabel id="source-filter-label">Source</InputLabel>
             <Select
-              labelId="source-filter-label"
               id="source-filter"
               value={source}
-              label="Source"
               onChange={handleSourceChange}
             >
               {sources.map((s) => (
@@ -133,12 +130,9 @@ const FilterBar = () => {
             Category
           </Typography>
           <FormControl size="small" fullWidth>
-            <InputLabel id="category-filter-label">Category</InputLabel>
             <Select
-              labelId="category-filter-label"
               id="category-filter"
               value={category}
-              label="Category"
               onChange={handleCategoryChange}
             >
               {categories.map((c) => (
@@ -155,12 +149,9 @@ const FilterBar = () => {
             Time range
           </Typography>
           <FormControl size="small" fullWidth>
-            <InputLabel id="days-filter-label">Time Range</InputLabel>
             <Select
-              labelId="days-filter-label"
               id="days-filter"
               value={days.toString()}
-              label="Time Range"
               onChange={handleDaysChange}
             >
               {timeRanges.map((t) => (

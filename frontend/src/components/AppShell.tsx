@@ -12,7 +12,6 @@ interface AppShellProps {
 interface NavigationItem {
   label: string;
   path: string;
-  description: string;
   icon: ElementType;
 }
 
@@ -20,13 +19,11 @@ const navigationItems: NavigationItem[] = [
   {
     label: 'Products',
     path: '/',
-    description: 'Daily launches and high-engagement posts',
     icon: DashboardOutlinedIcon,
   },
   {
     label: 'Topics',
     path: '/topics',
-    description: 'Cross-source trend and emerging topic signals',
     icon: InsightsOutlinedIcon,
   },
 ];
@@ -76,9 +73,6 @@ const AppShell = ({ children }: AppShellProps) => {
             <Typography variant="subtitle1" fontWeight={700}>
               Trendify
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Market and topic signals
-            </Typography>
           </Box>
         </Stack>
 
@@ -126,9 +120,6 @@ const AppShell = ({ children }: AppShellProps) => {
                     <Typography variant="subtitle2" fontWeight={700}>
                       {item.label}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.description}
-                    </Typography>
                   </Box>
                 </Stack>
               </ButtonBase>
@@ -136,11 +127,7 @@ const AppShell = ({ children }: AppShellProps) => {
           })}
         </Stack>
 
-        <Box sx={{ mt: 'auto', px: 1.5, pt: 3 }}>
-          <Typography variant="body2" color="text.secondary">
-            Documentation-style navigation that stays visible while scrolling.
-          </Typography>
-        </Box>
+        <Box sx={{ mt: 'auto', px: 1.5, pt: 3 }} />
       </Box>
 
       <Box sx={{ minWidth: 0 }}>
@@ -180,15 +167,10 @@ const AppShell = ({ children }: AppShellProps) => {
               <Typography variant="subtitle1" fontWeight={700}>
                 Trendify
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Market and topic signals
-              </Typography>
             </Box>
           </Stack>
 
-          <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', md: 'block' } }}>
-            Clean dashboard views for products and topics
-          </Typography>
+          <Box sx={{ display: { xs: 'none', md: 'block' } }} />
         </Box>
 
         <Box
