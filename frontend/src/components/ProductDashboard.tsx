@@ -25,15 +25,15 @@ import { format, subDays, addDays, parseISO } from 'date-fns';
 const ProductDashboard = () => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState<'engagement' | 'recency'>('engagement');
+  const [sortBy, setSortBy] = useState<'engagement' | 'recency' | 'momentum' | 'growth'>('engagement');
 
   // Use specific date instead of days range (default to March 9, 2026 - the latest date with data)
   const [selectedDate, setSelectedDate] = useState('2026-03-09');
   const [localSource, setLocalSource] = useState('all');
 
   // Build query params - fetch posts from selected date only
-  const buildParams = () => {
-    const params: any = {
+  const buildParams = (): { limit: number; date: string; source?: string } => {
+    const params: { limit: number; date: string; source?: string } = {
       limit: 100,
       date: selectedDate,
     };
@@ -103,9 +103,18 @@ const ProductDashboard = () => {
   const sortedProducts = [...products].sort((a, b) => {
     if (sortBy === 'engagement') {
       return b.engagement_score - a.engagement_score;
-    } else {
+    } else if (sortBy === 'recency') {
       return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+    } else if (sortBy === 'momentum') {
+      const aMomentum = a.velocity_metrics?.momentum_score ?? -Infinity;
+      const bMomentum = b.velocity_metrics?.momentum_score ?? -Infinity;
+      return bMomentum - aMomentum;
+    } else if (sortBy === 'growth') {
+      const aGrowth = a.velocity_metrics?.growth_rate ?? -Infinity;
+      const bGrowth = b.velocity_metrics?.growth_rate ?? -Infinity;
+      return bGrowth - aGrowth;
     }
+    return 0;
   });
 
   return (
@@ -146,7 +155,12 @@ const ProductDashboard = () => {
               </Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-              {format(parseISO(selectedDate), 'MMMM d, yyyy')} · {sortedProducts.length} items · {sortBy === 'engagement' ? 'sorted by engagement' : 'sorted by recency'}{localSource !== 'all' ? ` · ${localSource}` : ''}
+              {format(parseISO(selectedDate), 'MMMM d, yyyy')} · {sortedProducts.length} items · {
+                sortBy === 'engagement' ? 'sorted by engagement' :
+                sortBy === 'recency' ? 'sorted by recency' :
+                sortBy === 'momentum' ? 'sorted by momentum' :
+                'sorted by growth rate'
+              }{localSource !== 'all' ? ` · ${localSource}` : ''}
             </Typography>
           </Box>
 
@@ -313,6 +327,42 @@ const ProductDashboard = () => {
                   transition: 'all 0.2s',
                 }}
               />
+              <Chip
+                icon={<RocketLaunchIcon sx={{ fontSize: '16px !important' }} />}
+                label="Momentum"
+                onClick={() => setSortBy('momentum')}
+                clickable
+                sx={{
+                  borderRadius: 1.5,
+                  bgcolor: sortBy === 'momentum' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: sortBy === 'momentum' ? 'secondary.main' : 'text.secondary',
+                  border: '1px solid',
+                  borderColor: sortBy === 'momentum' ? 'rgba(99, 102, 241, 0.3)' : 'divider',
+                  fontWeight: sortBy === 'momentum' ? 600 : 500,
+                  '& .MuiChip-icon': {
+                    color: sortBy === 'momentum' ? 'secondary.main' : 'text.secondary',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
+              <Chip
+                icon={<TrendingUpIcon sx={{ fontSize: '16px !important' }} />}
+                label="Growth"
+                onClick={() => setSortBy('growth')}
+                clickable
+                sx={{
+                  borderRadius: 1.5,
+                  bgcolor: sortBy === 'growth' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: sortBy === 'growth' ? 'secondary.main' : 'text.secondary',
+                  border: '1px solid',
+                  borderColor: sortBy === 'growth' ? 'rgba(99, 102, 241, 0.3)' : 'divider',
+                  fontWeight: sortBy === 'growth' ? 600 : 500,
+                  '& .MuiChip-icon': {
+                    color: sortBy === 'growth' ? 'secondary.main' : 'text.secondary',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
             </Box>
           </Box>
         </Box>
@@ -344,7 +394,11 @@ const ProductDashboard = () => {
                 <Typography variant="body2" color="text.secondary">
                   {sortBy === 'engagement'
                     ? 'Sorted by engagement score (upvotes + comments)'
-                    : 'Sorted by publish date (newest first)'}
+                    : sortBy === 'recency'
+                    ? 'Sorted by publish date (newest first)'
+                    : sortBy === 'momentum'
+                    ? 'Sorted by momentum score (velocity of mentions)'
+                    : 'Sorted by growth rate (acceleration percentage)'}
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">

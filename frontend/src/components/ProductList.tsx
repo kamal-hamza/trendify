@@ -6,13 +6,15 @@ import {
   Link as MuiLink,
   Skeleton,
   Stack,
+  Chip,
+  Tooltip,
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import RedditIcon from '@mui/icons-material/Reddit';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowUp, MessageSquare, Clock } from 'lucide-react';
+import { ArrowUp, MessageSquare, Clock, Rocket, TrendingUp as TrendingUpLucide, Zap } from 'lucide-react';
 import TopicTags from './TopicTags';
 import SourceIndicator from './SourceIndicator';
 import type { Post } from '../services/api';
@@ -22,7 +24,7 @@ interface ProductListProps {
   isLoading: boolean;
 }
 
-const sourceConfig: Record<string, { icon: any; color: string; label: string }> = {
+const sourceConfig: Record<string, { icon: React.ComponentType; color: string; label: string }> = {
   HN: { icon: TrendingUpIcon, color: '#ff6600', label: 'Hacker News' },
   GITHUB: { icon: GitHubIcon, color: '#24292e', label: 'GitHub' },
   GITHUB_TRENDING: { icon: GitHubIcon, color: '#24292e', label: 'GitHub Trending' },
@@ -69,6 +71,21 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
     if (score > 200) return '#ff9800'; // High engagement - orange
     if (score > 50) return '#4caf50'; // Good engagement - green
     return '#2196f3'; // Normal engagement - blue
+  };
+
+  const getMomentumColor = (score: number): string => {
+    if (score > 5) return '#f44336'; // High momentum - red
+    if (score > 2) return '#ff9800'; // Medium momentum - orange
+    if (score > 0) return '#4caf50'; // Positive momentum - green
+    return '#9e9e9e'; // No momentum - grey
+  };
+
+  const getGrowthColor = (rate: number): string => {
+    if (rate > 2) return '#f44336'; // >200% growth - red
+    if (rate > 1) return '#ff9800'; // >100% growth - orange
+    if (rate > 0.5) return '#4caf50'; // >50% growth - green
+    if (rate > 0) return '#2196f3'; // Positive growth - blue
+    return '#9e9e9e'; // No/negative growth - grey
   };
 
   return (
@@ -182,7 +199,65 @@ const ProductList = ({ products, isLoading }: ProductListProps) => {
                       {formatDistanceToNow(new Date(product.published_at), { addSuffix: true })}
                     </Typography>
                   </Box>
+
+                  {/* Velocity Metrics */}
+                  {product.velocity_metrics && (
+                    <>
+                      <Tooltip title={`Momentum Score: ${product.velocity_metrics.momentum_score.toFixed(1)} (avg: ${product.velocity_metrics.avg_momentum.toFixed(1)})`}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getMomentumColor(product.velocity_metrics.momentum_score) }}>
+                          <TrendingUpLucide size={16} strokeWidth={2.5} />
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                            {product.velocity_metrics.momentum_score.toFixed(1)}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+
+                      <Tooltip title={`Current Growth: ${(product.velocity_metrics.growth_rate * 100).toFixed(0)}% (avg: ${(product.velocity_metrics.avg_growth_rate * 100).toFixed(0)}%, peak: ${(product.velocity_metrics.max_growth_rate * 100).toFixed(0)}%)`}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: getGrowthColor(product.velocity_metrics.growth_rate) }}>
+                          <Rocket size={16} strokeWidth={2.5} />
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                            +{(product.velocity_metrics.growth_rate * 100).toFixed(0)}%
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+
+                      {(product.velocity_metrics.momentum_score > 5 || product.velocity_metrics.growth_rate > 2) && (
+                        <Chip
+                          icon={<Zap size={14} />}
+                          label="EXPLODING"
+                          size="small"
+                          sx={{
+                            height: 22,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            bgcolor: '#fee2e2',
+                            color: '#dc2626',
+                            '& .MuiChip-icon': { color: '#dc2626' }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                 </Box>
+
+                {/* Velocity Details Badge */}
+                {product.velocity_metrics && (
+                  <Box sx={{ mb: 1 }}>
+                    <Tooltip title={`Topic: ${product.velocity_metrics.topic_name} (${product.velocity_metrics.total_mentions} mentions)`}>
+                      <Chip
+                        label={`${product.velocity_metrics.topic_name}: ${product.velocity_metrics.total_mentions} mentions`}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          height: 24,
+                          fontSize: '0.74rem',
+                          borderColor: getMomentumColor(product.velocity_metrics.momentum_score),
+                          color: getMomentumColor(product.velocity_metrics.momentum_score),
+                        }}
+                      />
+                    </Tooltip>
+                  </Box>
+                )}
 
                 {product.topic_names && product.topic_names.length > 0 && (
                   <TopicTags topics={product.topic_names} />
