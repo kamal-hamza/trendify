@@ -3,6 +3,7 @@ Data fetchers for Trendify - adapted from proof of concept script
 Fetches trending content from multiple platforms (HN, Reddit, GitHub)
 """
 
+import os
 import re
 import time
 from collections import Counter
@@ -825,15 +826,16 @@ class IndieHackersFetcher(BaseFetcher):
 
 
 class DevToFetcher(BaseFetcher):
-    """Fetches trending posts from Dev.to"""
+    """Fetches trending posts from Dev.to, especially #showdev"""
     
-    def fetch(self, days_ago: int = 7, per_page: int = 30) -> Dict[str, Any]:
+    def fetch(self, days_ago: int = 7, per_page: int = 30, tag: str = "showdev") -> Dict[str, Any]:
         """
-        Fetch trending articles from Dev.to
+        Fetch trending articles from Dev.to, filtered by tag
         
         Args:
             days_ago: Only fetch articles from last N days
             per_page: Number of articles per page
+            tag: Tag to filter by (default: "showdev" for Show Dev posts)
             
         Returns:
             Dictionary with posts and discovered topics
@@ -846,6 +848,7 @@ class DevToFetcher(BaseFetcher):
             params = {
                 "per_page": per_page,
                 "top": days_ago,  # Top articles from last N days
+                "tag": tag,  # Filter by showdev tag
             }
             
             response = requests.get(url, params=params, timeout=self.timeout)
@@ -865,9 +868,9 @@ class DevToFetcher(BaseFetcher):
                 # Extract tags as topics
                 post_topics = []
                 tags = article.get("tag_list", [])
-                for tag in tags:
-                    post_topics.append(tag)
-                    discovered_topics.add(tag)
+                for tag_name in tags:
+                    post_topics.append(tag_name)
+                    discovered_topics.add(tag_name)
                 
                 posts.append(
                     {
@@ -894,9 +897,258 @@ class DevToFetcher(BaseFetcher):
             return {"posts": [], "topics": []}
 
 
+class GitHubTrendingFetcher(BaseFetcher):
+    """Fetches daily trending repositories from GitHub"""
+    
+    def fetch(self, language: str = "", days_ago: int = 1) -> Dict[str, Any]:
+        """
+        Fetch trending repositories from GitHub
+        
+        Args:
+            language: Filter by programming language (empty for all languages)
+            days_ago: Fetch repos created in the last N days (default: 1 for daily trending)
+            
+        Returns:
+            Dictionary with posts and discovered topics
+        """
+        posts = []
+        discovered_topics = set()
+        
+        try:
+            # Use GitHub Search API to find recently created repos sorted by stars
+            url = "https://api.github.com/search/repositories"
+            
+            # Calculate date for filtering
+            from datetime import datetime, timedelta
+            since_date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+            
+            # Build query
+            query = f"created:>{since_date}"
+            if language:
+                query += f" language:{language}"
+            
+            params = {
+                "q": query,
+                "sort": "stars",
+                "order": "desc",
+                "per_page": 30,
+            }
+            
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+            }
+            
+            # Add GitHub token if available
+            github_token = os.getenv("GITHUB_TOKEN")
+            if github_token:
+                headers["Authorization"] = f"token {github_token}"
+            
+            response = requests.get(url, params=params, headers=headers, timeout=self.timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            repos = data.get("items", [])
+            
+            for repo in repos:
+                # Extract topics from GitHub repo
+                post_topics = repo.get("topics", [])
+                for topic in post_topics:
+                    discovered_topics.add(topic)
+                
+                # Also add language as a topic
+                if repo.get("language"):
+                    post_topics.append(repo["language"])
+                    discovered_topics.add(repo["language"])
+                
+                posts.append(
+                    {
+                        "external_id": f"github_trending_{repo.get('id', '')}",
+                        "title": repo.get("full_name", ""),
+                        "url": repo.get("html_url", ""),
+                        "source": "GITHUB_TRENDING",
+                        "score": repo.get("stargazers_count", 0),
+                        "num_comments": repo.get("open_issues_count", 0),
+                        "author": repo.get("owner", {}).get("login", ""),
+                        "content": repo.get("description", ""),
+                        "published_at": datetime.fromisoformat(
+                            repo.get("created_at", "").replace("Z", "+00:00")
+                        ),
+                        "topics": post_topics,
+                    }
+                )
+            
+            return {
+                "posts": posts,
+                "topics": list(discovered_topics),
+            }
+            
+        except Exception as e:
+            print(f"Error fetching GitHub trending: {e}")
+            return {"posts": [], "topics": []}
+
+
+class LobstersFetcher(BaseFetcher):
+    """Fetches posts from Lobste.rs with the 'show' tag"""
+    
+    def fetch(self, tag: str = "show") -> Dict[str, Any]:
+        """
+        Fetch posts from Lobste.rs filtered by tag
+        
+        Args:
+            tag: Tag to filter by (default: "show" for Show posts)
+            
+        Returns:
+            Dictionary with posts and discovered topics
+        """
+        posts = []
+        discovered_topics = set()
+        
+        try:
+            # Lobste.rs has a simple JSON API - just append .json to any URL
+            url = f"https://lobste.rs/t/{tag}.json"
+            
+            response = requests.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            
+            items = response.json()
+            
+            for item in items:
+                # Extract tags as topics
+                post_topics = item.get("tags", [])
+                for topic in post_topics:
+                    discovered_topics.add(topic)
+                
+                # Get submitter username correctly
+                submitter = ""
+                if isinstance(item.get("submitter_user"), dict):
+                    submitter = item.get("submitter_user", {}).get("username", "")
+                elif isinstance(item.get("submitter_user"), str):
+                    submitter = item.get("submitter_user", "")
+                
+                posts.append(
+                    {
+                        "external_id": f"lobsters_{item.get('short_id', '')}",
+                        "title": item.get("title", ""),
+                        "url": item.get("url", "") or item.get("comments_url", ""),
+                        "source": "LOBSTERS",
+                        "score": item.get("score", 0),
+                        "num_comments": item.get("comment_count", 0),
+                        "author": submitter,
+                        "content": item.get("description", ""),
+                        "published_at": datetime.fromisoformat(
+                            item.get("created_at", "").replace("Z", "+00:00")
+                        ),
+                        "topics": post_topics,
+                    }
+                )
+            
+            return {
+                "posts": posts,
+                "topics": list(discovered_topics),
+            }
+            
+        except Exception as e:
+            print(f"Error fetching from Lobste.rs: {e}")
+            return {"posts": [], "topics": []}
+
+
+class TAAFTFetcher(BaseFetcher):
+    """Fetches newest AI tools from There's An API For That"""
+    
+    def fetch(self, limit: int = 30) -> Dict[str, Any]:
+        """
+        Fetch newest AI tools from TAAFT
+        
+        Args:
+            limit: Number of tools to fetch
+            
+        Returns:
+            Dictionary with posts and discovered topics
+        """
+        posts = []
+        discovered_topics = set()
+        
+        try:
+            # Note: TAAFT API may require authentication or may block automated requests
+            # Using a simple scraping approach as fallback if API is not accessible
+            # For now, we'll return empty results if API fails (403 errors are common)
+            print("Note: TAAFT fetcher is experimental and may not work without API access")
+            return {"posts": [], "topics": []}
+            
+            # TAAFT has an API for their newest tools (keeping code for reference)
+            url = "https://www.theresanaiforthat.com/api/tools"
+            params = {
+                "sort": "newest",
+                "limit": limit,
+            }
+            
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            tools = data.get("tools", [])
+            
+            for tool in tools:
+                # Extract categories/tags as topics
+                post_topics = []
+                categories = tool.get("categories", [])
+                for category in categories:
+                    if isinstance(category, dict):
+                        cat_name = category.get("name", "")
+                    else:
+                        cat_name = str(category)
+                    
+                    if cat_name:
+                        post_topics.append(cat_name)
+                        discovered_topics.add(cat_name)
+                
+                # Also add AI-related tags
+                tags = tool.get("tags", [])
+                for tag in tags:
+                    if isinstance(tag, dict):
+                        tag_name = tag.get("name", "")
+                    else:
+                        tag_name = str(tag)
+                    
+                    if tag_name:
+                        post_topics.append(tag_name)
+                        discovered_topics.add(tag_name)
+                
+                posts.append(
+                    {
+                        "external_id": f"taaft_{tool.get('id', '')}",
+                        "title": tool.get("name", ""),
+                        "url": tool.get("url", "") or tool.get("website", ""),
+                        "source": "TAAFT",
+                        "score": tool.get("upvotes", 0) or tool.get("votes", 0),
+                        "num_comments": 0,  # TAAFT doesn't have comments
+                        "author": tool.get("submitter", "") or "",
+                        "content": tool.get("description", ""),
+                        "published_at": datetime.fromisoformat(
+                            tool.get("created_at", "").replace("Z", "+00:00")
+                        ) if tool.get("created_at") else timezone.now(),
+                        "topics": post_topics,
+                    }
+                )
+            
+            return {
+                "posts": posts,
+                "topics": list(discovered_topics),
+            }
+            
+        except Exception as e:
+            print(f"Error fetching from TAAFT: {e}")
+            # If API fails, try scraping as fallback
+            return {"posts": [], "topics": []}
+
+
 class KeywordExtractor:
     """
     Extract trending keywords from post titles using word frequency analysis
+    
+    NOTE: This class is currently DISABLED in the main pipeline.
+    We are focusing on native tags from platforms (Product Hunt tags, GitHub topics, etc.)
+    instead of extracting keywords from text.
     """
 
     def __init__(self):
@@ -1018,6 +1270,9 @@ class TrendifyAggregator:
         self.product_hunt_fetcher = ProductHuntFetcher(product_hunt_token)
         self.devto_fetcher = DevToFetcher()
         self.indiehackers_fetcher = IndieHackersFetcher()
+        self.github_trending_fetcher = GitHubTrendingFetcher()
+        self.lobsters_fetcher = LobstersFetcher()
+        self.taaft_fetcher = TAAFTFetcher()
         self.keyword_extractor = KeywordExtractor()
 
     def fetch_all(
@@ -1166,6 +1421,9 @@ class TrendifyAggregator:
         include_reddit_rising: bool = True,
         include_github_new: bool = True,
         include_indiehackers: bool = True,
+        include_github_trending: bool = True,
+        include_lobsters: bool = True,
+        include_taaft: bool = True,
     ) -> Dict[str, Any]:
         """
         Fetch only from emerging/early-stage sources
@@ -1173,11 +1431,14 @@ class TrendifyAggregator:
         
         Args:
             include_product_hunt: Fetch from Product Hunt
-            include_devto: Fetch from Dev.to
+            include_devto: Fetch from Dev.to (#showdev tag)
             include_show_hn: Fetch Show HN posts
             include_reddit_rising: Fetch rising posts from Reddit
             include_github_new: Fetch recently created GitHub repos
             include_indiehackers: Fetch from Indie Hackers
+            include_github_trending: Fetch from GitHub Trending (daily)
+            include_lobsters: Fetch from Lobste.rs (show tag)
+            include_taaft: Fetch from There's An API For That (newest AI tools)
             
         Returns:
             Dictionary with all_posts, discovered_topics, and stats
@@ -1205,16 +1466,16 @@ class TrendifyAggregator:
             except Exception as e:
                 stats["errors"].append(f"ProductHunt: {str(e)}")
         
-        # Dev.to - trending developer content
+        # Dev.to #showdev - developers showing off their projects
         if include_devto:
             try:
-                devto_result = self.devto_fetcher.fetch(days_ago=7)
+                devto_result = self.devto_fetcher.fetch(days_ago=7, tag="showdev")
                 devto_posts = devto_result.get("posts", [])
                 devto_topics = devto_result.get("topics", [])
                 
                 all_posts.extend(devto_posts)
                 discovered_topics.update(devto_topics)
-                stats["sources"]["DevTo"] = len(devto_posts)
+                stats["sources"]["DevTo_ShowDev"] = len(devto_posts)
                 time.sleep(1)
             except Exception as e:
                 stats["errors"].append(f"DevTo: {str(e)}")
@@ -1278,6 +1539,48 @@ class TrendifyAggregator:
             except Exception as e:
                 stats["errors"].append(f"IndieHackers: {str(e)}")
         
+        # GitHub Trending - daily trending repos
+        if include_github_trending:
+            try:
+                trending_result = self.github_trending_fetcher.fetch(days_ago=1)
+                trending_posts = trending_result.get("posts", [])
+                trending_topics = trending_result.get("topics", [])
+                
+                all_posts.extend(trending_posts)
+                discovered_topics.update(trending_topics)
+                stats["sources"]["GitHub_Trending"] = len(trending_posts)
+                time.sleep(1)
+            except Exception as e:
+                stats["errors"].append(f"GitHub_Trending: {str(e)}")
+        
+        # Lobste.rs - high-quality technical content with 'show' tag
+        if include_lobsters:
+            try:
+                lobsters_result = self.lobsters_fetcher.fetch(tag="show")
+                lobsters_posts = lobsters_result.get("posts", [])
+                lobsters_topics = lobsters_result.get("topics", [])
+                
+                all_posts.extend(lobsters_posts)
+                discovered_topics.update(lobsters_topics)
+                stats["sources"]["Lobsters"] = len(lobsters_posts)
+                time.sleep(1)
+            except Exception as e:
+                stats["errors"].append(f"Lobsters: {str(e)}")
+        
+        # TAAFT - newest AI tools and APIs
+        if include_taaft:
+            try:
+                taaft_result = self.taaft_fetcher.fetch(limit=30)
+                taaft_posts = taaft_result.get("posts", [])
+                taaft_topics = taaft_result.get("topics", [])
+                
+                all_posts.extend(taaft_posts)
+                discovered_topics.update(taaft_topics)
+                stats["sources"]["TAAFT"] = len(taaft_posts)
+                time.sleep(1)
+            except Exception as e:
+                stats["errors"].append(f"TAAFT: {str(e)}")
+        
         stats["total_posts"] = len(all_posts)
         stats["discovered_topics"] = len(discovered_topics)
         
@@ -1290,6 +1593,9 @@ class TrendifyAggregator:
     def extract_keywords(self, posts: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
         """
         Extract trending keywords from posts
+        
+        NOTE: This method is DISABLED in the main pipeline.
+        We are focusing on native tags from platforms instead.
 
         Args:
             posts: List of post dictionaries

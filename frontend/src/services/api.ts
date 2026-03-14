@@ -76,6 +76,19 @@ export interface EmergingTopic extends TrendingTopic {
   is_new: boolean;
 }
 
+export interface VelocityMetrics {
+  topic_id: number;
+  topic_name: string;
+  topic_category: string;
+  momentum_score: number;
+  growth_rate: number;
+  avg_growth_rate: number;
+  max_growth_rate: number;
+  avg_momentum: number;
+  total_mentions: number;
+  latest_date: string;
+}
+
 export interface Post {
   id: number;
   external_id: string;
@@ -93,6 +106,7 @@ export interface Post {
   content?: string;
   mentions?: TopicMention[];
   topic_names?: string[];
+  velocity_metrics?: VelocityMetrics | null;
 }
 
 export interface TopicMention {

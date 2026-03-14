@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
-  Box,
-  Typography,
-  Button,
   Alert,
+  Box,
+  Button,
   CircularProgress,
   Paper,
+  Stack,
+  Typography,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -72,75 +73,99 @@ const TrendDashboard = () => {
   };
 
   return (
-    <Box>
-      {/* Header */}
-      <Box
+    <Stack spacing={3}>
+      <Paper
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          mb: 3,
+          p: 3,
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TrendingUpIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-          <Typography variant="h3" component="h1" fontWeight="bold">
-            Trendify
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={refreshing ? <CircularProgress size={20} /> : <RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={refreshing}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          justifyContent="space-between"
         >
-          {refreshing ? 'Refreshing...' : 'Refresh Data'}
-        </Button>
-      </Box>
+          <Box>
+            <Typography variant="overline" color="text.secondary">
+              Topic overview
+            </Typography>
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.75 }}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2,
+                  display: 'grid',
+                  placeItems: 'center',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                }}
+              >
+                <TrendingUpIcon />
+              </Box>
+              <Typography variant="h3" component="h1">
+                {mode === 'emerging' ? 'Emerging topics' : 'Trending topics'}
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Tracks aggregate topic activity and momentum so category filters directly affect the ranked results below.
+            </Typography>
+          </Box>
 
-      {/* Subtitle */}
-      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
-        Real-time tech trend aggregation from GitHub, Hacker News, and Reddit
-      </Typography>
+          <Button
+            variant="contained"
+            startIcon={refreshing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing' : 'Refresh data'}
+          </Button>
+        </Stack>
+      </Paper>
 
-      {/* Filters */}
+      <StatsPanel stats={stats} isLoading={statsLoading} />
+
       <FilterBar />
 
-      {/* Error Alerts */}
       {trendsError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error">
           Failed to load trending topics: {(trendsError as Error).message}
         </Alert>
       )}
       {statsError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error">
           Failed to load statistics: {(statsError as Error).message}
         </Alert>
       )}
 
-      {/* Main Content Grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3 }}>
-        {/* Stats Panel - Left Side */}
-        <Box>
-          <StatsPanel stats={stats} isLoading={statsLoading} />
-        </Box>
+      <Paper sx={{ overflow: 'hidden' }}>
+        <Box
+          sx={{
+            p: 3,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: { xs: 'flex-start', md: 'center' },
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Box>
+            <Typography variant="h5">
+              {mode === 'emerging' ? 'Emerging topic list' : 'Topic ranking'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+              {trends.length} results · {days} day window{source !== 'all' ? ` · ${source}` : ''}{category !== 'all' ? ` · ${category}` : ''}
+            </Typography>
+          </Box>
 
-        {/* Trending Topics List - Right Side */}
-        <Box>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom fontWeight="bold">
-              {mode === 'emerging' ? 'Emerging Topics' : 'Trending Topics'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {mode === 'emerging' 
-                ? 'New and fast-growing topics with high growth rates'
-                : 'Sorted by momentum score (velocity of mentions over time)'}
-            </Typography>
-            <TrendList trends={trends} isLoading={trendsLoading} />
-          </Paper>
         </Box>
-      </Box>
-    </Box>
+        <TrendList trends={trends} isLoading={trendsLoading} />
+      </Paper>
+    </Stack>
   );
 };
 

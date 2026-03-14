@@ -156,6 +156,8 @@ class PostListSerializer(serializers.ModelSerializer):
 
     source_display = serializers.CharField(source="get_source_display", read_only=True)
     primary_topic = serializers.SerializerMethodField()
+    topic_names = serializers.SerializerMethodField()
+    velocity_metrics = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -172,12 +174,60 @@ class PostListSerializer(serializers.ModelSerializer):
             "published_at",
             "author",
             "primary_topic",
+            "topic_names",
+            "velocity_metrics",
         ]
 
     def get_primary_topic(self, obj):
         """Get the primary topic name if exists"""
         primary_mention = obj.mentions.filter(is_primary=True).first()
         return primary_mention.topic.name if primary_mention else None
+
+    def get_topic_names(self, obj):
+        """Get list of all topic names (native tags) for this post"""
+        return list(obj.topics.values_list("name", flat=True))
+
+    def get_velocity_metrics(self, obj):
+        """Get velocity metrics from primary topic"""
+        # Try to get primary mention first, fall back to any mention
+        primary_mention = obj.mentions.filter(is_primary=True).first()
+        if not primary_mention:
+            primary_mention = obj.mentions.first()
+        
+        if not primary_mention:
+            return None
+        
+        topic = primary_mention.topic
+        
+        # Get the most recent metric for this topic
+        latest_metric = topic.daily_metrics.order_by('-date').first()
+        
+        if not latest_metric:
+            return None
+        
+        # Get last 7 days of metrics for average calculations
+        recent_metrics = list(topic.daily_metrics.order_by('-date')[:7])
+        
+        if not recent_metrics:
+            return None
+        
+        # Calculate average growth rate over recent period
+        avg_growth = sum(m.growth_rate for m in recent_metrics) / len(recent_metrics)
+        max_growth = max(m.growth_rate for m in recent_metrics)
+        avg_momentum = sum(m.momentum_score for m in recent_metrics) / len(recent_metrics)
+        
+        return {
+            'topic_id': topic.id,
+            'topic_name': topic.name,
+            'topic_category': topic.category,
+            'momentum_score': float(latest_metric.momentum_score),
+            'growth_rate': float(latest_metric.growth_rate),
+            'avg_growth_rate': float(avg_growth),
+            'max_growth_rate': float(max_growth),
+            'avg_momentum': float(avg_momentum),
+            'total_mentions': latest_metric.total_mentions,
+            'latest_date': latest_metric.date.isoformat(),
+        }
 
 
 class TopicDailyMetricSerializer(serializers.ModelSerializer):

@@ -1,15 +1,6 @@
-import { Paper, Typography, Box, Skeleton, Chip } from '@mui/material';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { Paper, Typography, Box, Skeleton } from '@mui/material';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import type { FeedStats } from '../services/api';
-
-const COLORS: Record<string, string> = {
-  HN: '#ff6600',
-  REDDIT_LOCALLLAMA: '#ff4500',
-  REDDIT_MACHINELEARNING: '#ff4500',
-  REDDIT_PROGRAMMING: '#ff4500',
-  GITHUB: '#24292e',
-  TWITTER: '#1da1f2',
-};
 
 interface StatsPanelProps {
   stats?: FeedStats;
@@ -19,148 +10,119 @@ interface StatsPanelProps {
 const StatsPanel = ({ stats, isLoading }: StatsPanelProps) => {
   if (isLoading || !stats) {
     return (
-      <Paper sx={{ p: 3, height: '100%' }}>
-        <Skeleton variant="text" width="60%" height={32} sx={{ mb: 2 }} />
-        <Skeleton variant="rectangular" height={200} />
-        <Box sx={{ mt: 2 }}>
-          <Skeleton variant="text" height={24} />
-          <Skeleton variant="text" height={24} />
-          <Skeleton variant="text" height={24} />
+      <Paper sx={{ p: 2, height: '100%' }}>
+        <Skeleton variant="text" width="60%" height={24} sx={{ mb: 1 }} />
+        <Skeleton variant="rectangular" height={100} sx={{ mb: 2, borderRadius: 2 }} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+          <Skeleton variant="rectangular" height={60} sx={{ borderRadius: 2 }} />
+          <Skeleton variant="rectangular" height={60} sx={{ borderRadius: 2 }} />
         </Box>
       </Paper>
     );
   }
 
-  // Prepare chart data from sources breakdown
-  const chartData = Object.entries(stats.sources_breakdown).map(([source, count]) => ({
-    name: source,
-    value: count,
-    color: COLORS[source] || '#999999',
-  }));
-
-  const sentimentColor = 
-    stats.avg_sentiment > 0.3 ? '#4caf50' : 
-    stats.avg_sentiment < -0.3 ? '#f44336' : 
-    '#757575';
+  const sentimentColor =
+    stats.avg_sentiment > 0.05 ? '#10B981' :
+      stats.avg_sentiment < -0.05 ? '#EF4444' :
+        '#64748B';
 
   const sentimentLabel =
-    stats.avg_sentiment > 0.3 ? 'Positive' :
-    stats.avg_sentiment < -0.3 ? 'Negative' :
-    'Neutral';
+    stats.avg_sentiment > 0.05 ? 'Positive' :
+      stats.avg_sentiment < -0.05 ? 'Negative' :
+        'Neutral';
+
+  // Create data for a simple gauge/pie chart to visualize sentiment (-1 to 1 mapped to 0-100)
+  const normalizedSentiment = ((stats.avg_sentiment + 1) / 2) * 100;
+  const sentimentData = [
+    { name: 'Sentiment', value: normalizedSentiment },
+    { name: 'Remaining', value: 100 - normalizedSentiment }
+  ];
 
   return (
-    <Paper 
-      elevation={2}
-      sx={{ 
-        p: 3, 
-        height: '100%',
-        borderRadius: 2,
-      }}
-    >
-      <Typography variant="h6" gutterBottom fontWeight="bold">
+    <Paper sx={{ p: 2.5, height: '100%' }}>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
         Overview
       </Typography>
 
-      {/* Pie Chart */}
-      {chartData.length > 0 && (
-        <Box sx={{ height: 250, my: 3 }}>
+      {/* Sentiment Chart Section */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        p: 2,
+        mb: 2,
+        borderRadius: 2,
+        bgcolor: '#F8FAFC',
+        border: '1px solid rgba(0,0,0,0.04)'
+      }}>
+        <Box sx={{ width: 80, height: 80, position: 'relative', mr: 2 }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={chartData}
+                data={sentimentData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
+                innerRadius={25}
+                outerRadius={35}
+                startAngle={180}
+                endAngle={0}
                 dataKey="value"
+                stroke="none"
               >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
+                <Cell fill={sentimentColor} />
+                <Cell fill="#E2E8F0" />
               </Pie>
-              <Tooltip />
-              <Legend />
             </PieChart>
           </ResponsiveContainer>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '55%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 700, color: sentimentColor }}>
+              {stats.avg_sentiment > 0 ? '+' : ''}{stats.avg_sentiment.toFixed(2)}
+            </Typography>
+          </Box>
         </Box>
-      )}
-
-      {/* Stats Grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
         <Box>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Total Posts
+          <Typography variant="body2" color="text.secondary">
+            Average Sentiment
           </Typography>
-          <Typography variant="h5" fontWeight="bold">
-            {stats.total_posts.toLocaleString()}
-          </Typography>
-        </Box>
-
-        <Box>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Total Topics
-          </Typography>
-          <Typography variant="h5" fontWeight="bold">
-            {stats.total_topics.toLocaleString()}
-          </Typography>
-        </Box>
-
-        <Box>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Active Topics
-          </Typography>
-          <Typography variant="h5" fontWeight="bold" color="primary.main">
-            {stats.total_active_topics.toLocaleString()}
-          </Typography>
-        </Box>
-
-        <Box>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Avg Sentiment
-          </Typography>
-          <Typography variant="h5" fontWeight="bold" color={sentimentColor}>
+          <Typography variant="h6" sx={{ color: sentimentColor, fontWeight: 700, lineHeight: 1.2 }}>
             {sentimentLabel}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            ({stats.avg_sentiment.toFixed(2)})
           </Typography>
         </Box>
       </Box>
 
-      {/* Top Categories */}
-      {stats.top_categories && stats.top_categories.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Top Categories
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-            {stats.top_categories.slice(0, 5).map((cat) => (
-              <Chip
-                key={cat.category}
-                label={`${cat.category}: ${cat.count}`}
-                size="small"
-                variant="outlined"
-              />
-            ))}
+      {/* Metrics Section */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {[
+          { label: 'Total posts', value: stats.total_posts.toLocaleString(), tone: 'text.primary' },
+          { label: 'Total topics', value: stats.total_topics.toLocaleString(), tone: 'text.primary' },
+          { label: 'Active topics', value: stats.total_active_topics.toLocaleString(), tone: 'primary.main' },
+        ].map((item, idx) => (
+          <Box
+            key={item.label}
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              py: 1,
+              borderBottom: idx < 2 ? '1px solid rgba(0,0,0,0.04)' : 'none'
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {item.label}
+            </Typography>
+            <Typography variant="body2" sx={{ color: item.tone, fontWeight: 600 }}>
+              {item.value}
+            </Typography>
           </Box>
-        </Box>
-      )}
-
-      {/* Date Range */}
-      {stats.date_range && (
-        <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" color="text.secondary" display="block">
-            Data Range
-          </Typography>
-          <Typography variant="body2">
-            {new Date(stats.date_range.earliest).toLocaleDateString()} 
-            {' - '}
-            {new Date(stats.date_range.latest).toLocaleDateString()}
-          </Typography>
-        </Box>
-      )}
+        ))}
+      </Box>
     </Paper>
   );
 };

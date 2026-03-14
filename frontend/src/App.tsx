@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { Container, Box } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, responsiveFontSizes } from '@mui/material';
 import TrendDashboard from './components/TrendDashboard';
+import ProductDashboard from './components/ProductDashboard';
+import AppShell from './components/AppShell';
 
 // Create React Query client with default options
 const queryClient = new QueryClient({
@@ -17,28 +17,107 @@ const queryClient = new QueryClient({
 });
 
 // Create Material-UI theme
-const theme = createTheme({
+let theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1976d2',
+      main: '#0F172A',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#6366F1',
+      contrastText: '#ffffff',
+    },
+    success: {
+      main: '#10B981',
+    },
+    warning: {
+      main: '#F59E0B',
+    },
+    error: {
+      main: '#EF4444',
+    },
+    text: {
+      primary: '#0F172A',
+      secondary: '#475569',
     },
     background: {
-      default: '#f5f5f5',
+      default: '#F8FAFC',
+      paper: '#FFFFFF',
     },
+    divider: 'rgba(0, 0, 0, 0.08)',
+  },
+  shape: {
+    borderRadius: 12,
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontSize: '3rem',
+      fontWeight: 700,
+      letterSpacing: '-0.04em',
+    },
+    h2: {
+      fontSize: '2.4rem',
+      fontWeight: 700,
+      letterSpacing: '-0.03em',
+    },
+    h3: {
+      fontSize: '1.9rem',
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
+    },
+    h4: {
+      fontSize: '1.5rem',
+      fontWeight: 600,
+    },
+    h5: {
+      fontSize: '1.2rem',
+      fontWeight: 600,
+    },
+    subtitle1: {
+      fontSize: '1rem',
+      fontWeight: 500,
+    },
+    button: {
+      fontWeight: 600,
+      textTransform: 'none',
+    },
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: '#F8FAFC',
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
+          borderRadius: 12,
+          boxShadow: 'none',
+          border: '1px solid rgba(0,0,0,0.08)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+          borderRadius: 12,
+          border: '1px solid rgba(0,0,0,0.08)',
+          boxShadow: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
           borderRadius: 8,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          paddingInline: 18,
+          minHeight: 40,
+          boxShadow: 'none',
         },
       },
     },
@@ -46,11 +125,53 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 6,
+          fontWeight: 500,
+        },
+      },
+    },
+    MuiToggleButtonGroup: {
+      styleOverrides: {
+        grouped: {
+          borderRadius: '8px !important',
+          border: '1px solid rgba(0,0,0,0.08) !important',
+          margin: 0,
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px !important',
+          paddingInline: 14,
+          textTransform: 'none',
+          backgroundColor: '#FFFFFF',
+          color: '#475569',
+          '&.Mui-selected': {
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            color: '#6366F1',
+          },
+        },
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          backgroundColor: '#FFFFFF',
+        },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
         },
       },
     },
   },
 });
+
+theme = responsiveFontSizes(theme);
 
 function App() {
   return (
@@ -58,17 +179,15 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Router>
-          <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
-            <Container maxWidth="xl" sx={{ py: 4 }}>
-              <Routes>
-                <Route path="/" element={<TrendDashboard />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Container>
-          </Box>
+          <AppShell>
+            <Routes>
+              <Route path="/" element={<ProductDashboard />} />
+              <Route path="/topics" element={<TrendDashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AppShell>
         </Router>
       </ThemeProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }

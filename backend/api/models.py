@@ -237,10 +237,13 @@ class Post(models.Model):
         ("REDDIT_MACHINELEARNING", "r/MachineLearning"),
         ("REDDIT_PROGRAMMING", "r/programming"),
         ("GITHUB", "GitHub"),
+        ("GITHUB_TRENDING", "GitHub Trending"),
         ("TWITTER", "Twitter/X"),
         ("PRODUCT_HUNT", "Product Hunt"),
         ("DEVTO", "Dev.to"),
         ("INDIEHACKERS", "Indie Hackers"),
+        ("LOBSTERS", "Lobste.rs"),
+        ("TAAFT", "There's An API For That"),
         ("OTHER", "Other"),
     ]
 
